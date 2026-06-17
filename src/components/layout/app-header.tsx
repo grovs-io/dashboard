@@ -31,6 +31,7 @@ import {
   useMauQuery,
 } from "@/hooks/queries/usePaymentsQueries";
 import { config } from "@/lib/config";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 
 type AppHeaderProps = {
   titleOverride?: string;
@@ -97,6 +98,10 @@ export default function AppHeader({
   };
 
   const displayLimitReach = () => {
+    // No billing/upgrade banner in self-hosted mode.
+    if (IS_SELF_HOSTED) {
+      return;
+    }
     if (!planLoaded) {
       return;
     }

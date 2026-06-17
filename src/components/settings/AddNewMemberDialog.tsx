@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { addMemberSchema, type AddMemberFormValues } from "@/schemas/member";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 
 const AddNewMemberDialog = ({
   open,
@@ -74,8 +75,10 @@ const AddNewMemberDialog = ({
               className="text-sm text-muted-foreground"
             >
               You can add new members to your project, giving them access to
-              specific areas based on their assigned role. They will receive an
-              email to create an account once invited.
+              specific areas based on their assigned role.{" "}
+              {IS_SELF_HOSTED
+                ? "You'll get an invite link to share with them."
+                : "They will receive an email to create an account once invited."}
             </span>
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-4 w-full max-w-[600px]">

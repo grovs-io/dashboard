@@ -15,6 +15,7 @@ import microsoftIcon from "@/assets/icons/generic/Microsoft.svg";
 import Image from "next/image";
 import Link from "next/link";
 import { config } from "@/lib/config";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 import type { UseFormReturn } from "react-hook-form";
 import type { LoginFormValues } from "@/schemas/auth";
 
@@ -36,7 +37,9 @@ export function LoginForm({
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Welcome back</CardTitle>
           <CardDescription>
-            Login with your Google or Microsoft account
+            {IS_SELF_HOSTED
+              ? "Login with your email and password"
+              : "Login with your Google or Microsoft account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -50,41 +53,45 @@ export function LoginForm({
             }}
           >
             <div className="grid gap-6">
-              <div className="flex flex-col gap-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  type="button"
-                  onClick={() => loginWithSSO("google_oauth2")}
-                >
-                  <Image
-                    src={googleIcon}
-                    alt="Google Icon"
-                    width={24}
-                    height={24}
-                  />
-                  Login with Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  type="button"
-                  onClick={() => loginWithSSO("microsoft_graph")}
-                >
-                  <Image
-                    src={microsoftIcon}
-                    alt="Microsoft Icon"
-                    width={24}
-                    height={24}
-                  />
-                  Login with Microsoft
-                </Button>
-              </div>
-              <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
-                <span className="bg-card text-muted-foreground relative z-10 px-2">
-                  Or continue with
-                </span>
-              </div>
+              {!IS_SELF_HOSTED && (
+                <>
+                  <div className="flex flex-col gap-4">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      type="button"
+                      onClick={() => loginWithSSO("google_oauth2")}
+                    >
+                      <Image
+                        src={googleIcon}
+                        alt="Google Icon"
+                        width={24}
+                        height={24}
+                      />
+                      Login with Google
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      type="button"
+                      onClick={() => loginWithSSO("microsoft_graph")}
+                    >
+                      <Image
+                        src={microsoftIcon}
+                        alt="Microsoft Icon"
+                        width={24}
+                        height={24}
+                      />
+                      Login with Microsoft
+                    </Button>
+                  </div>
+                  <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+                    <span className="bg-card text-muted-foreground relative z-10 px-2">
+                      Or continue with
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="grid gap-6">
                 <div className="grid gap-3">
                   <Label htmlFor="email">Email</Label>
@@ -134,12 +141,17 @@ export function LoginForm({
                   Login
                 </Button>
               </div>
-              <div className="text-center text-sm">
-                Don&apos;t have an account?{" "}
-                <Link href="/register" className="underline underline-offset-4">
-                  Sign up
-                </Link>
-              </div>
+              {!IS_SELF_HOSTED && (
+                <div className="text-center text-sm">
+                  Don&apos;t have an account?{" "}
+                  <Link
+                    href="/register"
+                    className="underline underline-offset-4"
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
             </div>
           </form>
         </CardContent>

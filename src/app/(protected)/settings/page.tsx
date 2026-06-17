@@ -51,8 +51,9 @@ import { DateRange } from "react-day-picker";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import SessionStorage from "@/lib/SessionStorage";
 import RevenueTracking from "@/components/settings/RevenueTracking";
+import InviteLinkDialog from "@/components/settings/InviteLinkDialog";
 import ActionConfirm from "@/components/common/action-confirm";
-import { IS_ENTERPRISE } from "@/lib/edition";
+import { IS_ENTERPRISE, IS_SELF_HOSTED } from "@/lib/edition";
 import MigrationDeepLinkRedirect from "./MigrationDeepLinkRedirect";
 
 const SettingsPage = () => {
@@ -75,6 +76,7 @@ const SettingsPage = () => {
   const mau = mauQuery.data ?? { current_quantity: 0, total_available: 1 };
 
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [, setcollectRevenue] = useState<boolean>(false);
   const [openConfirm, setOpenConfirm] = useState<boolean>(false);
 
@@ -130,10 +132,14 @@ const SettingsPage = () => {
 
   const handleInviteMember = async (email: string, role: string) => {
     try {
-      await addMemberMutation.mutateAsync({ email, role });
+      const res = await addMemberMutation.mutateAsync({ email, role });
       trackEvent(EVENTS.TEAM_MEMBER_INVITED);
       // Members query auto-invalidated by mutation
       setInviteDialogOpen(false);
+      // Self-hosted: surface the copyable invite link (no email is sent).
+      if (IS_SELF_HOSTED && res?.data?.invite_url) {
+        setInviteLink(res.data.invite_url);
+      }
     } catch {
       showGenericError();
     }
@@ -288,6 +294,12 @@ const SettingsPage = () => {
   return (
     <div className="flex flex-col relative overflow-hidden h-dvh">
       <MigrationDeepLinkRedirect />
+      {IS_SELF_HOSTED && (
+        <InviteLinkDialog
+          inviteUrl={inviteLink}
+          onOpenChange={(open) => !open && setInviteLink(null)}
+        />
+      )}
       {IS_ENTERPRISE && (
         <ActionConfirm
           title="Are you sure you want to disable revenue tracking?"
@@ -346,9 +358,12 @@ const SettingsPage = () => {
 
             {/* Remaining sections — constrained width */}
             <div className="max-w-[800px] px-6 py-8">
-              <PlanSection />
-
-              <Separator className="my-8" />
+              {!IS_SELF_HOSTED && (
+                <>
+                  <PlanSection />
+                  <Separator className="my-8" />
+                </>
+              )}
 
               <TeamMebersSection
                 members={parsedMembers}

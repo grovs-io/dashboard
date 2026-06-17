@@ -25,6 +25,11 @@ export interface InstanceMembersResponse {
   }[];
 }
 
+export interface AddMemberResponse {
+  // Self-hosted only: copyable invite link (no email is sent).
+  invite_url?: string;
+}
+
 export interface InstanceDetailsResponse {
   get_started_setup: GetStartedSetup;
 }
@@ -85,7 +90,7 @@ export const addMemberToInstanceAPICall = async (
   instanceId: string,
   email: string,
   role: string
-): Promise<AxiosResponse<InstanceMembersResponse>> => {
+): Promise<AxiosResponse<AddMemberResponse>> => {
   const data = {
     email: email,
     role: role,

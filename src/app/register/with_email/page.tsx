@@ -4,10 +4,11 @@ import { useState } from "react";
 
 import { RegisterForm } from "@/components/registerForm/RegisterForm";
 import { showGenericError } from "@/lib/Notifications";
-import { useRouter } from "next/navigation";
+import { useRouter, redirect } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterFormValues } from "@/schemas/auth";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 
 const REGISTER_DEFAULT_VALUES: RegisterFormValues = {
   name: "",
@@ -41,6 +42,9 @@ const Page = () => {
       showGenericError();
     }
   };
+
+  // Public sign-up is closed in self-hosted mode (backend also rejects it).
+  if (IS_SELF_HOSTED) redirect("/login");
 
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10 w-full">
