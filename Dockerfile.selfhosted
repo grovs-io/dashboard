@@ -1,0 +1,31 @@
+# Self-hosted dashboard image. NEXT_PUBLIC_* are inlined at build time from build args
+# (Next.js bakes them into the bundle), so they must be passed at `docker build` time.
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_PATH=/api/v1
+ARG NEXT_PUBLIC_CLIENT_ID
+ARG NEXT_PUBLIC_SELF_HOSTED=true
+ARG NEXT_PUBLIC_ENV=production
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_API_PATH=${NEXT_PUBLIC_API_PATH} \
+    NEXT_PUBLIC_CLIENT_ID=${NEXT_PUBLIC_CLIENT_ID} \
+    NEXT_PUBLIC_SELF_HOSTED=${NEXT_PUBLIC_SELF_HOSTED} \
+    NEXT_PUBLIC_ENV=${NEXT_PUBLIC_ENV}
+
+RUN npm run build
+
+RUN apk add --no-cache curl
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:3000/ || exit 1
+
+# CLIENT_SECRET (server-side, for the /api/auth/token route) is supplied at runtime.
+CMD ["npm", "run", "start"]
