@@ -21,7 +21,13 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # npm's audit endpoint returns 503 now and then; retry before calling it a failure.
+      - run: |
+          for i in 1 2 3; do
+            npm audit --audit-level=high && exit 0
+            echo "npm audit attempt $i failed, retrying in 60s"; sleep 60
+          done
+          exit 1
 
   lint:
     name: Lint
