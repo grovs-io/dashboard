@@ -4,7 +4,7 @@ import {
   keepPreviousData,
 } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
-import { IS_SELF_HOSTED } from "@/lib/edition";
+import { IS_ENTERPRISE, IS_SELF_HOSTED } from "@/lib/edition";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
 import { useIsInstanceAdmin } from "@/hooks/useIsInstanceAdmin";
 import {
@@ -37,6 +37,8 @@ export function normalizeAuditFilters(
 export function useAuditLogEnabled(instanceId: string | undefined): boolean {
   const subscriptionQuery = useSubscriptionQuery(instanceId);
   if (!instanceId) return false;
+  // The audit log lives in the enterprise backend; a Community Edition build has no routes for it.
+  if (!IS_ENTERPRISE) return false;
   if (IS_SELF_HOSTED) return true;
   return subscriptionQuery.data?.isEnterprise === true;
 }

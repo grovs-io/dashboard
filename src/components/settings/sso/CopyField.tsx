@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy } from "lucide-react";
+import { copyToClipboard } from "@/lib/copyTextHelper";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ export default function CopyField({
 }) {
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(value);
+      if (!(await copyToClipboard(value))) throw new Error("copy failed");
       showSuccessNotification("Copied");
     } catch {
       showErrorNotification(

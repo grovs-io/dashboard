@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { copyToClipboard } from "@/lib/copyTextHelper";
 import { Copy, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -70,7 +71,7 @@ export default function CreateAuditExportTokenDialog({
   const handleCopy = async () => {
     if (!plainToken) return;
     try {
-      await navigator.clipboard.writeText(plainToken);
+      if (!(await copyToClipboard(plainToken))) throw new Error("copy failed");
       showSuccessNotification("Copied");
     } catch {
       showErrorNotification(
