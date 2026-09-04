@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import ReactPasswordChecklist from "react-password-checklist";
 import type { UseFormReturn } from "react-hook-form";
 import type { RegisterFormValues } from "@/schemas/auth";
+import { FieldError } from "@/components/common/FieldError";
+import { PasswordChecklist } from "@/components/common/PasswordChecklist";
 
 export function RegisterForm({
   className,
@@ -23,6 +24,18 @@ export function RegisterForm({
   } = form;
   const watchedPassword = form.watch("password");
   const watchedPasswordConfirm = form.watch("password_confirm");
+
+  // Reveal the password rules as soon as the user starts typing (not only after
+  // a failed submit) so they can see exactly which requirements are unmet.
+  const showChecklist = showConditions || watchedPassword.length > 0;
+
+  // Derive the mismatch from the live values rather than `errors.password_confirm`.
+  // react-hook-form only re-validates the field being edited, so the zod refine
+  // error on the confirm field goes stale when the user fixes the *password*
+  // field — leaving "Passwords do not match" showing even once they match.
+  const passwordsMismatch =
+    watchedPasswordConfirm.length > 0 &&
+    watchedPassword !== watchedPasswordConfirm;
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -41,13 +54,10 @@ export function RegisterForm({
                     type="text"
                     placeholder="Enter name"
                     required
+                    aria-invalid={!!errors.name}
                     {...form.register("name")}
                   />
-                  {errors.name && (
-                    <p className="text-sm text-red-600">
-                      {errors.name.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.name?.message} />
                 </div>
                 {!acceptInvite && (
                   <div className="grid gap-3">
@@ -57,13 +67,10 @@ export function RegisterForm({
                       type="email"
                       placeholder="Enter email"
                       required
+                      aria-invalid={!!errors.email}
                       {...form.register("email")}
                     />
-                    {errors.email && (
-                      <p className="text-sm text-red-600">
-                        {errors.email.message}
-                      </p>
-                    )}
+                    <FieldError message={errors.email?.message} />
                   </div>
                 )}
                 <div className="grid gap-3">
@@ -75,8 +82,10 @@ export function RegisterForm({
                     type="password"
                     placeholder="Enter password"
                     required
+                    aria-invalid={!!errors.password}
                     {...form.register("password")}
                   />
+                  <FieldError message={errors.password?.message} />
                 </div>
                 <div className="grid gap-3">
                   <div className="flex items-center">
@@ -87,24 +96,21 @@ export function RegisterForm({
                     type="password"
                     placeholder="Confirm password"
                     required
+                    aria-invalid={passwordsMismatch}
                     {...form.register("password_confirm")}
                   />
+                  <FieldError
+                    message={
+                      passwordsMismatch ? "Passwords do not match" : undefined
+                    }
+                  />
                 </div>
-                <div className={showConditions ? "visible" : "hidden"}>
-                  <ReactPasswordChecklist
-                    iconSize={14}
+                <div className={showChecklist ? "visible" : "hidden"}>
+                  <PasswordChecklist
+                    password={watchedPassword}
+                    passwordConfirm={watchedPasswordConfirm}
                     minLength={8}
-                    value={watchedPassword}
-                    valueAgain={watchedPasswordConfirm}
-                    rules={[
-                      "minLength",
-                      "specialChar",
-                      "capital",
-                      "lowercase",
-                      "number",
-                      "match",
-                    ]}
-                    onChange={(isValid) => setPasswordRulesValid(isValid)}
+                    onValidityChange={setPasswordRulesValid}
                   />
                 </div>
 

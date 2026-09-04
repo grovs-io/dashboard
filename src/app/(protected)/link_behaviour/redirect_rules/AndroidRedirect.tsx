@@ -21,6 +21,7 @@ import androidIconDark from "@/assets/icons/generic/Android_dark_mode.svg";
 import { useRef } from "react";
 import { useTheme } from "next-themes";
 import OptionCard from "./OptionCard";
+import ClipboardToggle from "@/components/common/clipboard-toggle";
 import Link from "next/link";
 import { useFormContext } from "react-hook-form";
 import type { RedirectRulesFormValues } from "@/schemas/redirect";
@@ -41,6 +42,7 @@ const AndroidRedirect = ({
   const androidStore = watch("android.appStore");
   const customUrl = watch("android.customUrl");
   const androidShowPreview = watch("android.showPreview");
+  const androidCopyToClipboard = watch("android.copyToClipboard");
 
   const { resolvedTheme } = useTheme();
   const urlIsValid =
@@ -108,6 +110,11 @@ const AndroidRedirect = ({
               setValue(
                 "android.showPreview",
                 defaultValues?.android?.showPreview ?? false,
+                { shouldDirty: true }
+              );
+              setValue(
+                "android.copyToClipboard",
+                defaultValues?.android?.copyToClipboard ?? false,
                 { shouldDirty: true }
               );
               setTimeout(
@@ -192,6 +199,17 @@ const AndroidRedirect = ({
             description="Redirects immediately with no intermediate page. Faster, but some browsers may not open the app correctly."
           />
         </div>
+        {androidShowPreview && (
+          <ClipboardToggle
+            id="android-copy-to-clipboard"
+            checked={androidCopyToClipboard}
+            onCheckedChange={(checked) =>
+              setValue("android.copyToClipboard", checked, {
+                shouldDirty: true,
+              })
+            }
+          />
+        )}
       </div>
 
       {/* Redirect to App: options */}

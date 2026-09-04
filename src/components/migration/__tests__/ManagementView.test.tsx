@@ -16,6 +16,8 @@ function buildSource(
     id: 1,
     provider: "branch",
     old_host: "old.acme.com",
+    provider_hosted: false,
+    extra_hosts: [],
     enabled: true,
     health: "healthy",
     consecutive_failures: 0,
@@ -253,5 +255,50 @@ describe("ManagementView", () => {
       screen.getByRole("button", { name: /^remove migration$/i })
     );
     expect(await screen.findByLabelText(/type .* to confirm/i)).toHaveValue("");
+  });
+
+  describe("provider-hosted", () => {
+    const phSource = buildSource({
+      provider_hosted: true,
+      extra_hosts: ["a.app.link", "b.app.link"],
+      old_host: "xyz.app.link",
+    });
+
+    it("shows the health badge and bridge note, no DNS copy", () => {
+      setup({ source: phSource, domain: null });
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(screen.getByText(/sdk-only bridge/i)).toBeInTheDocument();
+      expect(screen.queryByText(/dns still points/i)).not.toBeInTheDocument();
+    });
+
+    it("lists extra hosts and saves an edited list", async () => {
+      const onUpdateExtraHosts = vi.fn().mockResolvedValue(undefined);
+      setup({ source: phSource, domain: null, onUpdateExtraHosts });
+      expect(screen.getByText("a.app.link")).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: /edit extra hosts/i })
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: /remove b\.app\.link/i })
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: /save extra hosts/i })
+      );
+      await waitFor(() => {
+        expect(onUpdateExtraHosts).toHaveBeenCalledWith(["a.app.link"]);
+      });
+    });
+
+    it("shows degraded badge from health", () => {
+      setup({
+        source: buildSource({
+          provider_hosted: true,
+          old_host: "xyz.app.link",
+          health: "degraded",
+        }),
+        domain: null,
+      });
+      expect(screen.getByText("Degraded")).toBeInTheDocument();
+    });
   });
 });

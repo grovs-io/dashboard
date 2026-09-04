@@ -25,7 +25,12 @@ vi.mock("../MigrationWizard", () => ({
 
 vi.mock("@/hooks/queries/useConfigurationQueries", () => ({
   useCustomDomainPreflightQuery: vi.fn(),
-  useCustomDomainsQuery: vi.fn(),
+  useCustomDomainsEnvelopeQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/edition", () => ({
+  IS_ENTERPRISE: false,
+  IS_SELF_HOSTED: true,
 }));
 
 vi.mock("@/hooks/queries/useMigrationQueries", () => ({
@@ -60,7 +65,7 @@ vi.mock("@/components/settings/ScaleUpDialog", () => ({
 
 import {
   useCustomDomainPreflightQuery,
-  useCustomDomainsQuery,
+  useCustomDomainsEnvelopeQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import { useMigrationSourceQuery } from "@/hooks/queries/useMigrationQueries";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
@@ -68,7 +73,7 @@ import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMuta
 import { useProjectSelection } from "@/context/useProjectSelection";
 import MigrationEntry from "../MigrationEntry";
 
-const mockedDomains = vi.mocked(useCustomDomainsQuery);
+const mockedDomains = vi.mocked(useCustomDomainsEnvelopeQuery);
 const mockedPreflight = vi.mocked(useCustomDomainPreflightQuery);
 const mockedSource = vi.mocked(useMigrationSourceQuery);
 const mockedSubscription = vi.mocked(useSubscriptionQuery);
@@ -102,6 +107,8 @@ function makeSource(overrides: Partial<MigrationSource> = {}): MigrationSource {
     id: 1,
     provider: "branch",
     old_host: "old.acme.com",
+    provider_hosted: false,
+    extra_hosts: [],
     enabled: true,
     health: "healthy",
     consecutive_failures: 0,
@@ -113,9 +120,12 @@ function makeSource(overrides: Partial<MigrationSource> = {}): MigrationSource {
   };
 }
 
-function setDomains(data: CustomDomain[] = []) {
+function setDomains(
+  data: CustomDomain[] = [],
+  envelope: Record<string, unknown> = {}
+) {
   mockedDomains.mockReturnValue({
-    data,
+    data: { custom_domains: data, ...envelope },
     isLoading: false,
     isError: false,
     error: null,
@@ -171,6 +181,20 @@ describe("MigrationEntry", () => {
     mockedCreateSubscription.mockReturnValue({
       mutateAsync: vi.fn(),
     } as never);
+  });
+
+  it("shows a skeleton while the domain list is loading", () => {
+    mockedDomains.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
+    renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+    expect(
+      screen.queryByRole("button", { name: /migrate from another platform/i })
+    ).toBeNull();
   });
 
   it("shows the compact migration launcher when no migration has started", () => {
@@ -359,5 +383,79 @@ describe("MigrationEntry", () => {
       <MigrationEntry projectId={PROJECT_ID} />
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  describe("manual mode", () => {
+    const manualEnvelope = {
+      tls_mode: "manual",
+      ingress_host: "links.app.com",
+    };
+
+    it("labels a pending manual row Pending, not Waiting for SSL", () => {
+      setDomains(
+        [makeDomain({ status: "pending", ssl_status: null })],
+        manualEnvelope
+      );
+      setSource({ data: makeSource() });
+      renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+      expect(screen.getByText(/^pending$/i)).toBeInTheDocument();
+      expect(screen.queryByText(/waiting for ssl/i)).toBeNull();
+    });
+
+    it("shows Active and Manage for an active manual row even when preflight fails", () => {
+      setDomains(
+        [makeDomain({ status: "active", ssl_status: null })],
+        manualEnvelope
+      );
+      setSource({ data: makeSource() });
+      setPreflight(false);
+      renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /manage/i })
+      ).toBeInTheDocument();
+    });
+
+    it("opens the wizard, not the upsell, without a subscription", () => {
+      setDomains([], manualEnvelope);
+      setSource({ data: null });
+      mockedSubscription.mockReturnValue({
+        data: { subscription: null },
+        isLoading: false,
+      } as never);
+      renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+      fireEvent.click(
+        screen.getByRole("button", { name: /migrate from another platform/i })
+      );
+      expect(screen.queryByText(/requires a paid plan/i)).toBeNull();
+      expect(screen.getByTestId("migration-wizard-stub")).toBeInTheDocument();
+    });
+  });
+
+  describe("provider-hosted sources", () => {
+    it("shows Manage and the health label for a provider-hosted source", () => {
+      setSource({
+        data: makeSource({
+          provider_hosted: true,
+          old_host: "xyz.app.link",
+        }),
+      });
+      setDomains([]);
+      renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+      expect(screen.getByText("xyz.app.link")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /manage/i })
+      ).toBeInTheDocument();
+    });
+
+    it("shows Degraded when a provider-hosted source is unhealthy", () => {
+      setSource({
+        data: makeSource({ provider_hosted: true, health: "degraded" }),
+      });
+      setDomains([]);
+      renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+      expect(screen.getByText("Degraded")).toBeInTheDocument();
+    });
   });
 });

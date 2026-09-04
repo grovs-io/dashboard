@@ -6,6 +6,7 @@ import {
   TEST_LINK,
   TEST_CAMPAIGN,
   TEST_SUBSCRIPTION,
+  TEST_METRICS_OVERVIEW,
   MOCK_TOKENS,
 } from "./test-data";
 
@@ -14,7 +15,55 @@ import {
  * Call this in beforeEach or in a fixture to mock the API layer.
  */
 export async function setupApiMocks(page: Page) {
-  // Auth endpoints
+  // Register catch-all first so later, specific route mocks take precedence.
+  await page.route("**/api/v1/**", async (route) => {
+    console.warn(
+      `Unhandled API route: ${route.request().method()} ${route.request().url()}`
+    );
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({}),
+    });
+  });
+
+  // Auth endpoints. The app posts to the BFF routes under /api/auth/*; the upstream
+  // /oauth/* call happens server-side where page.route cannot intercept it.
+  const loginResponse = {
+    ...MOCK_TOKENS,
+    user: {
+      id: TEST_USER.id,
+      email: TEST_USER.email,
+      name: TEST_USER.name,
+      roles: [{ instance_id: TEST_INSTANCE.id, role: "admin" }],
+      otp_required_for_login: false,
+    },
+  };
+
+  await page.route("**/api/auth/token", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(loginResponse),
+    });
+  });
+
+  await page.route("**/api/auth/refresh", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(MOCK_TOKENS),
+    });
+  });
+
+  await page.route("**/api/auth/revoke", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: "{}",
+    });
+  });
+
   await page.route("**/oauth/token", async (route) => {
     const request = route.request();
     if (request.method() === "POST") {
@@ -26,19 +75,29 @@ export async function setupApiMocks(page: Page) {
     }
   });
 
+  const currentUserResponse = {
+    user: {
+      id: TEST_USER.id,
+      email: TEST_USER.email,
+      name: TEST_USER.name,
+      roles: [{ instance_id: TEST_INSTANCE.id, role: "admin" }],
+      otp_required_for_login: false,
+    },
+  };
+
   await page.route("**/api/v1/me", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({
-        user: {
-          id: TEST_USER.id,
-          email: TEST_USER.email,
-          name: TEST_USER.name,
-          roles: [{ instance_id: TEST_INSTANCE.id, role: "admin" }],
-          otp_required_for_login: false,
-        },
-      }),
+      body: JSON.stringify(currentUserResponse),
+    });
+  });
+
+  await page.route("**/api/v1/users/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(currentUserResponse),
     });
   });
 
@@ -288,7 +347,9 @@ export async function setupApiMocks(page: Page) {
         contentType: "application/json",
         body: JSON.stringify({
           redirect_config: {
-            default_fallback: "",
+            // must be set, otherwise the create link/campaign dialogs are
+            // replaced by the "redirect rules required" gate
+            default_fallback: "https://test.grovs.io",
             show_preview_android: false,
             show_preview_ios: false,
           },
@@ -361,15 +422,220 @@ export async function setupApiMocks(page: Page) {
     }
   );
 
-  // Catch-all for unhandled API routes
-  await page.route("**/api/v1/**", async (route) => {
-    console.warn(
-      `Unhandled API route: ${route.request().method()} ${route.request().url()}`
-    );
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({}),
-    });
-  });
+  // --- endpoints the api moved to; the older paths above no longer match ---
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/links/**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          links: [TEST_LINK],
+          meta: { total_pages: 1, total_entries: 1 },
+        }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/links/random_path`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ valid_path: "random-path" }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/campaigns/**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [TEST_CAMPAIGN],
+          total_pages: 1,
+          total_entries: 1,
+        }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/notifications/**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], total_pages: 0, total_entries: 0 }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/custom_domain`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          custom_domain: null,
+          tls_mode: "cloudflare",
+          ingress_host: null,
+        }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/instances/${TEST_INSTANCE.id}/billing/**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({}),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/instances/${TEST_INSTANCE.id}/billing/subscription`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(TEST_SUBSCRIPTION),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/instances/${TEST_INSTANCE.id}/billing/mau`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ current_quantity: 500, total_available: 10000 }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/instances/${TEST_INSTANCE.id}/events/billing`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        // the query returns metrics_values directly; undefined trips tanstack
+        body: JSON.stringify({ metrics_values: [] }),
+      });
+    }
+  );
+
+  // Analytics overview (the dashboard)
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/dashboard/**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ metrics: {}, links: [] }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/dashboard/top_links`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ links: [TEST_LINK] }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/dashboard/links_views`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          metrics: { "2026-07-15": 10, "2026-07-16": 25, "2026-07-17": 40 },
+        }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/dashboard/metrics_overview`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ metrics: TEST_METRICS_OVERVIEW }),
+      });
+    }
+  );
+
+  // Analytics overview key metrics (current + previous range use the same mock)
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/analytics/overview/key-metrics*`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ metrics: TEST_METRICS_OVERVIEW.current }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/analytics/overview/key-metrics/series*`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ points: [] }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/analytics/overview/trends/users*`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          points: [
+            { date: "2026-07-15", new_users: 10, previous_new_users: 8 },
+            { date: "2026-07-16", new_users: 25, previous_new_users: 12 },
+            { date: "2026-07-17", new_users: 40, previous_new_users: 20 },
+          ],
+        }),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/analytics/retention/summary*`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          day_1: 0.4,
+          day_7: 0.2,
+          day_30: 0.1,
+          sparkline: [],
+          median_churn_day: null,
+        }),
+      });
+    }
+  );
 }

@@ -1,10 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { capturePosthog } from "@/analytics/posthog";
 import { categorizeError } from "@/lib/errorUtils";
-import { useRouter } from "next/navigation";
+import { ErrorState } from "@/components/common/ErrorState";
 
 export default function LinkBehaviourError({
   error,
@@ -13,8 +12,6 @@ export default function LinkBehaviourError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const router = useRouter();
-
   useEffect(() => {
     console.error("Caught in link_behaviour/error.tsx:", error);
     capturePosthog("error_boundary_triggered", {
@@ -26,24 +23,5 @@ export default function LinkBehaviourError({
 
   const { title, description } = categorizeError(error);
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-      <h2 className="text-xl font-semibold text-destructive">{title}</h2>
-      <p className="my-3 text-sm text-muted-foreground max-w-md">
-        {description}
-      </p>
-      <div className="flex items-center gap-3">
-        <Button onClick={() => reset()} size="sm">
-          Try Again
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => router.push("/link_behaviour/redirect_rules")}
-        >
-          Back to Redirect Rules
-        </Button>
-      </div>
-    </div>
-  );
+  return <ErrorState title={title} description={description} onRetry={reset} />;
 }

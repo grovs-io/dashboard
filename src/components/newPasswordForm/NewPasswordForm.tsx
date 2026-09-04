@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import ReactPasswordChecklist from "react-password-checklist";
 import type { UseFormReturn } from "react-hook-form";
 import type { NewPasswordFormValues } from "@/schemas/auth";
+import { PasswordChecklist } from "@/components/common/PasswordChecklist";
 
 export function NewPasswordForm({
   className,
@@ -28,6 +28,7 @@ export function NewPasswordForm({
   } = form;
   const watchedPassword = form.watch("password");
   const watchedPasswordConfirm = form.watch("password_confirm");
+  const showChecklist = showConditions || watchedPassword.length > 0;
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -63,21 +64,12 @@ export function NewPasswordForm({
                   />
                 </div>
 
-                <div className={showConditions ? "visible" : "hidden"}>
-                  <ReactPasswordChecklist
-                    iconSize={14}
+                <div className={showChecklist ? "visible" : "hidden"}>
+                  <PasswordChecklist
+                    password={watchedPassword}
+                    passwordConfirm={watchedPasswordConfirm}
                     minLength={8}
-                    value={watchedPassword}
-                    valueAgain={watchedPasswordConfirm}
-                    rules={[
-                      "minLength",
-                      "specialChar",
-                      "capital",
-                      "lowercase",
-                      "number",
-                      "match",
-                    ]}
-                    onChange={(isValid) => setPasswordRulesValid(isValid)}
+                    onValidityChange={setPasswordRulesValid}
                   />
                 </div>
 

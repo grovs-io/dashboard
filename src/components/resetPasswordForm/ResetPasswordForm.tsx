@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import type { UseFormReturn } from "react-hook-form";
 import type { ResetPasswordFormValues } from "@/schemas/auth";
+import { FieldError } from "@/components/common/FieldError";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 
 export function ResetPasswordForm({
   className,
@@ -30,8 +32,8 @@ export function ResetPasswordForm({
           </CardTitle>
           <CardDescription>
             {linkSent
-              ? "We have sent a password recover instructions to your email."
-              : "  Enter the email address associated with your account and we'll send you a link to reset your password."}
+              ? "We've sent password recovery instructions to your email."
+              : "Enter the email address associated with your account and we'll send you a link to reset your password."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -45,13 +47,10 @@ export function ResetPasswordForm({
                     type="email"
                     placeholder="m@example.com"
                     required
+                    aria-invalid={!!form.formState.errors.email}
                     {...form.register("email")}
                   />
-                  {form.formState.errors.email && (
-                    <p className="text-sm text-red-600">
-                      {form.formState.errors.email.message}
-                    </p>
-                  )}
+                  <FieldError message={form.formState.errors.email?.message} />
                 </div>
                 <div className="flex flex-col gap-2">
                   {linkSent && (
@@ -60,7 +59,7 @@ export function ResetPasswordForm({
                         href="#"
                         className=" text-sm underline-offset-4 hover:underline "
                       >
-                        Did not receive the e-mail ??
+                        Didn&apos;t receive the email?
                       </Link>
                     </div>
                   )}
@@ -72,17 +71,19 @@ export function ResetPasswordForm({
                     {linkSent ? "Send again" : "Send link"}
                   </Button>
                 </div>
-                <div className=" text-start text-m gap-5">
-                  <p className="text-sm flex gap-1 center">
-                    Not a member ?
-                    <a
-                      href="/register"
-                      className="text-sm underline-offset-4 underline "
-                    >
-                      Create an account
-                    </a>
-                  </p>
-                </div>
+                {!IS_SELF_HOSTED && (
+                  <div className=" text-start text-m gap-5">
+                    <p className="text-sm flex gap-1 center">
+                      Not a member?
+                      <a
+                        href="/register"
+                        className="text-sm underline-offset-4 underline "
+                      >
+                        Create an account
+                      </a>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </form>

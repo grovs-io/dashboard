@@ -241,7 +241,7 @@ export function WizardSidebar({
                     isCompleted
                       ? "bg-valid-green-light-2 text-valid-green"
                       : isActive
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary"
                         : "bg-muted text-muted-foreground"
                   )}
                 >

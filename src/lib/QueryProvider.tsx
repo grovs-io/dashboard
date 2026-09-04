@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { useState, type ReactNode } from "react";
+import { ApiError } from "@/lib/ApiError";
 
 const ReactQueryDevtools = dynamic(
   () =>
@@ -20,7 +21,9 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
           queries: {
             staleTime: 30_000,
             gcTime: 5 * 60_000,
-            retry: 1,
+            retry: (failureCount, error) =>
+              failureCount < 1 &&
+              !(error instanceof ApiError && error.status === 503),
             refetchOnWindowFocus: false,
           },
         },

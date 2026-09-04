@@ -25,7 +25,10 @@ export type {
   InstanceMember,
   InstanceConfig,
   PlatformAppConfig,
+  AnalyticsPlan,
+  AnalyticsRetention,
 } from "./instance";
+export { isUnlimitedRetentionPlan } from "./instance";
 export type { User, UserRole, AuthResponse } from "./user";
 export type { Link, DashboardLink, RedirectURL } from "./link";
 export type { Campaign } from "./campaign";
@@ -70,7 +73,41 @@ export type {
   GetCampaignsParams,
   GetRevenueParams,
   GetMessagingParams,
+  AnalyticsDateRangeParams,
+  AnalyticsEventsParams,
+  AnalyticsEventVolumeParams,
+  AnalyticsFieldValuesParams,
+  AnalyticsOverviewParams,
+  OverviewKeyMetricSeriesParams,
+  AnalyticsRetentionSummaryParams,
 } from "./query";
+export type {
+  AnalyticsEvent,
+  EventsListResponse,
+  EventDetailResponse,
+  EventVolumeResponse,
+  EventVolumeBucket,
+  EventFieldValuesResponse,
+  EventFieldsResponse,
+  EventField,
+  EventFilter,
+  VersionsResponse,
+  VersionDistributionResponse,
+  VersionDistributionEntry,
+  VersionFunnelResponse,
+  FunnelStep,
+  UserTrendsResponse,
+  TrendPoint,
+  SourcesBreakdownResponse,
+  SourceEntry,
+  OverviewKeyMetrics,
+  OverviewKeyMetricsResponse,
+  ChartableKeyMetric,
+  KeyMetricSeriesPoint,
+  KeyMetricSeriesResponse,
+  RetentionSummaryResponse,
+  SparklinePoint,
+} from "./analytics";
 export type {
   ButtonCraftProps,
   TextCraftProps,
@@ -88,6 +125,9 @@ export type {
   CustomDomainPurpose,
   CustomDomainSource,
   CustomDomainsListResponse,
+  CustomDomainTlsMode,
+  CustomDomainSetupRecord,
+  CustomDomainEnvelopeFields,
 } from "./configuration";
 export type {
   MigrationProvider,
@@ -103,3 +143,22 @@ export type {
   UpdateMigrationSourcePayload,
   MigrationTestResponse,
 } from "./migration";
+export type {
+  AuditActor,
+  AuditEvent,
+  AuditEventsResponse,
+  AuditHeadResponse,
+  AuditEventFilters,
+  AuditEventsParams,
+  AuditExportToken,
+  AuditExportTokensResponse,
+  AuditExportTokenCreateResponse,
+} from "./audit";
+export type {
+  SsoDomain,
+  SsoConnection,
+  SsoConnectionResponse,
+  SsoConnectionUpsertPayload,
+  SsoDiscoverResponse,
+  SsoRefusalBody,
+} from "./sso";

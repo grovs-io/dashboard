@@ -8,17 +8,22 @@ export interface Link {
   name: string;
   path: string;
   active: boolean;
-  ads_platform: string;
+  // null for links the dashboard didn't create (e.g. migrated ones)
+  ads_platform: string | null;
   tags: string[];
   title?: string;
   subtitle?: string;
   image?: string;
   data?: Record<string, string>;
-  ios_custom_redirect?: RedirectURL;
-  android_custom_redirect?: RedirectURL;
-  desktop_custom_redirect?: RedirectURL;
-  show_preview_ios?: boolean;
-  show_preview_android?: boolean;
+  ios_custom_redirect?: RedirectURL | null;
+  android_custom_redirect?: RedirectURL | null;
+  desktop_custom_redirect?: RedirectURL | null;
+  // null = inherit the project default; the copy flags are only effective when
+  // the preview page shows.
+  show_preview_ios?: boolean | null;
+  show_preview_android?: boolean | null;
+  copy_to_clipboard_ios?: boolean | null;
+  copy_to_clipboard_android?: boolean | null;
   tracking_campaign?: string;
   tracking_medium?: string;
   tracking_source?: string;

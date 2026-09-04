@@ -2,13 +2,22 @@ import type {
   CustomDomain,
   CustomDomainPreflight,
   CustomDomainStatus,
+  CustomDomainTlsMode,
 } from "@/types";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 
 // DNS preflight (CNAME check) cadence — one constant shared by the custom
 // domain dialog and the migration wizard so the pace can't drift between them.
 // Lives here (not in useConfigurationQueries) so tests that mock the query
 // module don't lose it.
 export const CUSTOM_DOMAIN_PREFLIGHT_POLL_MS = 15000;
+
+// Requires both the backend flag and the self-hosted build — SaaS never renders manual mode.
+export function isManualCustomDomainMode(
+  tlsMode: CustomDomainTlsMode | null | undefined
+): boolean {
+  return IS_SELF_HOSTED && tlsMode === "manual";
+}
 
 // "Still being set up" statuses: the row exists and Grovs is waiting on DNS /
 // Cloudflare. Single source of truth so the dialog, the settings card, and the
@@ -59,7 +68,12 @@ export function preflightCnameVerdict(
 // those payloads the only meaningful instruction is the CNAME, so the dialog
 // falls back to the original CNAME-first UI instead of waiting forever for a
 // TXT challenge that will never arrive.
-export function isLegacyCustomDomainPayload(domain: CustomDomain): boolean {
+// A tls_mode-bearing envelope proves a current backend, so those rows are never legacy.
+export function isLegacyCustomDomainPayload(
+  domain: CustomDomain,
+  tlsMode?: CustomDomainTlsMode | null
+): boolean {
+  if (tlsMode != null) return false;
   return (
     domain.ssl_validation_txt_records === undefined &&
     domain.ssl_status == null &&

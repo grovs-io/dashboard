@@ -3,13 +3,20 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ApiError } from "@/lib/ApiError";
 
 vi.mock("@/hooks/queries/useConfigurationQueries", () => ({
-  useCustomDomainQuery: vi.fn(),
+  useCustomDomainEnvelopeQuery: vi.fn(),
   useCustomDomainPreflightQuery: vi.fn(),
 }));
 
 vi.mock("@/hooks/mutations/useConfigurationMutations", () => ({
   useAddCustomDomainMutation: vi.fn(),
   useRemoveCustomDomainMutation: vi.fn(),
+  useVerifyCustomDomainMutation: vi.fn(),
+}));
+
+// Manual-mode branches require the self-hosted build flag.
+vi.mock("@/lib/edition", () => ({
+  IS_ENTERPRISE: false,
+  IS_SELF_HOSTED: true,
 }));
 
 vi.mock("@/lib/Notifications", () => ({
@@ -40,32 +47,42 @@ vi.mock("next/navigation", () => ({
 }));
 
 import {
-  useCustomDomainQuery,
+  useCustomDomainEnvelopeQuery,
   useCustomDomainPreflightQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import {
   useAddCustomDomainMutation,
   useRemoveCustomDomainMutation,
+  useVerifyCustomDomainMutation,
 } from "@/hooks/mutations/useConfigurationMutations";
 import { showRetryableError } from "@/lib/Notifications";
 import { handleCopyText } from "@/lib/copyTextHelper";
 import CustomDomainDialog from "../configuration/CustomDomainDialog";
 
-const mockedQuery = vi.mocked(useCustomDomainQuery);
+const mockedQuery = vi.mocked(useCustomDomainEnvelopeQuery);
 const mockedPreflightQuery = vi.mocked(useCustomDomainPreflightQuery);
 const mockedAddMutation = vi.mocked(useAddCustomDomainMutation);
 const mockedRemoveMutation = vi.mocked(useRemoveCustomDomainMutation);
+const mockedVerifyMutation = vi.mocked(useVerifyCustomDomainMutation);
 const mockedShowRetryableError = vi.mocked(showRetryableError);
 const mockedCopy = vi.mocked(handleCopyText);
 
-function setQuery(partial: Record<string, unknown>) {
+// `data` is the row (or null); the helper wraps it in the response envelope.
+function setQuery(
+  partial: Record<string, unknown>,
+  envelope: Record<string, unknown> = {}
+) {
+  const { data, ...rest } = partial as { data?: unknown };
   mockedQuery.mockReturnValue({
-    data: null,
+    data:
+      "data" in partial
+        ? { custom_domain: data ?? null, ...envelope }
+        : undefined,
     isLoading: false,
     isError: false,
     error: null,
     refetch: vi.fn(),
-    ...partial,
+    ...rest,
   } as never);
 }
 
@@ -96,18 +113,24 @@ function renderDialog(props: Record<string, unknown> = {}) {
 describe("CustomDomainDialog", () => {
   let addMutateAsync: ReturnType<typeof vi.fn>;
   let removeMutateAsync: ReturnType<typeof vi.fn>;
+  let verifyMutateAsync: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     setPreflight(null);
     addMutateAsync = vi.fn().mockResolvedValue({ data: {} });
     removeMutateAsync = vi.fn().mockResolvedValue({ data: {} });
+    verifyMutateAsync = vi.fn().mockResolvedValue({ data: {} });
     mockedAddMutation.mockReturnValue({
       mutateAsync: addMutateAsync,
       isPending: false,
     } as never);
     mockedRemoveMutation.mockReturnValue({
       mutateAsync: removeMutateAsync,
+      isPending: false,
+    } as never);
+    mockedVerifyMutation.mockReturnValue({
+      mutateAsync: verifyMutateAsync,
       isPending: false,
     } as never);
   });
@@ -741,5 +764,182 @@ describe("CustomDomainDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /add subdomain/i }));
     expect(await screen.findByText(/already configured/i)).toBeInTheDocument();
     expect(refetch).toHaveBeenCalled();
+  });
+
+  describe("manual mode (self-hosted, no Cloudflare)", () => {
+    const manualEnvelope = {
+      tls_mode: "manual",
+      ingress_host: "links.app.com",
+    };
+
+    const manualRow = {
+      hostname: "links.acme.com",
+      purpose: "primary",
+      status: "pending",
+      ssl_status: null,
+      verification_errors: null,
+      source: "enterprise",
+      cname_target: "links.app.com",
+      ssl_validation_txt_records: [],
+      setup_records: [
+        {
+          kind: "certificate",
+          type: null,
+          name: null,
+          value: null,
+          note: "Issue a certificate covering links.acme.com and attach it to your load balancer's HTTPS listener.",
+        },
+        {
+          kind: "dns",
+          type: "CNAME",
+          name: "links.acme.com",
+          value: "links.app.com",
+          note: "Add this only after the certificate is attached.",
+        },
+      ],
+    };
+
+    it("bypasses the paywall when the deployment is manual", () => {
+      setQuery({ data: null }, manualEnvelope);
+      renderDialog({ hasPaidPlan: false });
+      expect(screen.queryByText(/requires a paid plan/i)).toBeNull();
+      expect(screen.getByPlaceholderText("links.acme.com")).toBeInTheDocument();
+    });
+
+    it("holds a skeleton instead of flashing the upsell while the domain query loads", () => {
+      setQuery({ isLoading: true });
+      renderDialog({ hasPaidPlan: false });
+      expect(screen.queryByText(/requires a paid plan/i)).toBeNull();
+      expect(screen.queryByPlaceholderText("links.acme.com")).toBeNull();
+    });
+
+    it("renders the manual checklist with a Pending chip and Verify button for a pending row", () => {
+      setQuery({ data: manualRow }, manualEnvelope);
+      renderDialog();
+      expect(
+        screen.getByText(/issue a certificate covering/i)
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/hostname ownership verified/i)).toBeNull();
+      expect(screen.queryByText(/we re-check your dns/i)).toBeNull();
+      expect(screen.getByText("Pending")).toBeInTheDocument();
+      expect(screen.getByText(/activates automatically/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /verify now/i })
+      ).toBeInTheDocument();
+    });
+
+    it("calls the verify mutation with the hostname", async () => {
+      setQuery({ data: manualRow }, manualEnvelope);
+      renderDialog();
+      fireEvent.click(screen.getByRole("button", { name: /verify now/i }));
+      await waitFor(() =>
+        expect(verifyMutateAsync).toHaveBeenCalledWith("links.acme.com")
+      );
+    });
+
+    it("shows a throttle notice when verify returns 429", async () => {
+      setQuery({ data: manualRow }, manualEnvelope);
+      verifyMutateAsync.mockRejectedValueOnce(new ApiError("throttled", 429));
+      renderDialog();
+      fireEvent.click(screen.getByRole("button", { name: /verify now/i }));
+      expect(await screen.findByText(/too many attempts/i)).toBeInTheDocument();
+    });
+
+    it("renders the row's verification_errors verbatim", () => {
+      setQuery(
+        {
+          data: {
+            ...manualRow,
+            verification_errors: ["No valid certificate for this host yet"],
+          },
+        },
+        manualEnvelope
+      );
+      renderDialog();
+      expect(
+        screen.getByText("No valid certificate for this host yet")
+      ).toBeInTheDocument();
+    });
+
+    it("treats active as authoritative even when preflight says the CNAME is not pointed", () => {
+      setQuery({ data: { ...manualRow, status: "active" } }, manualEnvelope);
+      setPreflight({ hostname: "links.acme.com", cname_matches: false });
+      renderDialog();
+      expect(screen.queryByText(/issue a certificate covering/i)).toBeNull();
+      expect(
+        screen.getByRole("link", { name: /links\.acme\.com/i })
+      ).toBeInTheDocument();
+    });
+
+    it("does not promise included SSL in the manual add form", () => {
+      setQuery({ data: null }, manualEnvelope);
+      renderDialog();
+      expect(screen.queryByText(/ssl is included/i)).toBeNull();
+    });
+
+    it("shows a generic retry message on 502, not a Cloudflare one", async () => {
+      setQuery({ data: null }, manualEnvelope);
+      addMutateAsync.mockRejectedValueOnce(new ApiError("bad gateway", 502));
+      renderDialog();
+      fireEvent.change(screen.getByPlaceholderText("links.acme.com"), {
+        target: { value: "links.acme.com" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /add subdomain/i }));
+      await waitFor(() => expect(mockedShowRetryableError).toHaveBeenCalled());
+      expect(mockedShowRetryableError.mock.calls[0]?.[0]).not.toMatch(
+        /cloudflare/i
+      );
+    });
+
+    it("keeps an existing row manageable when ingress_host is null", () => {
+      setQuery({ data: manualRow }, { tls_mode: "manual", ingress_host: null });
+      renderDialog();
+      expect(
+        screen.getByText(/issue a certificate covering/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /remove/i })
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/contact your administrator/i)).toBeNull();
+    });
+
+    it("routes a failed manual row to the manual body with Verify, not Cloudflare Retry", () => {
+      setQuery(
+        {
+          data: {
+            ...manualRow,
+            status: "failed",
+            verification_errors: ["Host did not respond within 3s"],
+          },
+        },
+        manualEnvelope
+      );
+      renderDialog();
+      expect(
+        screen.getByText(/issue a certificate covering/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /verify now/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Host did not respond within 3s")
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^retry$/i })).toBeNull();
+    });
+
+    it("never promises included SSL while the dialog is still loading", () => {
+      setQuery({ isLoading: true });
+      renderDialog({ planLoading: true, hasPaidPlan: false });
+      expect(screen.queryByText(/ssl is included/i)).toBeNull();
+    });
+
+    it("shows the administrator note when the deployment has no ingress host", () => {
+      setQuery({ data: null }, { tls_mode: "manual", ingress_host: null });
+      renderDialog();
+      expect(
+        screen.getByText(/contact your administrator/i)
+      ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("links.acme.com")).toBeNull();
+    });
   });
 });

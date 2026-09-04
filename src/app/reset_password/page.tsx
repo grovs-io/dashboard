@@ -3,7 +3,13 @@
 import { ResetPasswordForm } from "@/components/resetPasswordForm/ResetPasswordForm";
 
 import { useUserContext } from "@/context/useUserContext";
-import { showGenericError, showSuccessNotification } from "@/lib/Notifications";
+import {
+  showErrorNotification,
+  showGenericError,
+  showSuccessNotification,
+} from "@/lib/Notifications";
+import { getSsoRefusal } from "@/lib/ApiError";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +19,7 @@ import {
 } from "@/schemas/auth";
 
 const Page = () => {
+  const router = useRouter();
   const { resetPassword } = useUserContext();
   const [linkSent, setLinkSent] = useState(false);
 
@@ -27,7 +34,13 @@ const Page = () => {
       await resetPassword(data.email);
       setLinkSent(true);
       showSuccessNotification("Email sent");
-    } catch {
+    } catch (error) {
+      const refusal = getSsoRefusal(error);
+      if (refusal) {
+        showErrorNotification(refusal.error);
+        router.replace(`/login?email=${encodeURIComponent(data.email)}`);
+        return;
+      }
       showGenericError();
     }
   };

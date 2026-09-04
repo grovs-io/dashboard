@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isRateLimited } from "../rateLimit";
+import { serverConfig } from "@/lib/serverConfig";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const API_URL = serverConfig.apiUrl;
+const CLIENT_ID = serverConfig.clientId;
+const CLIENT_SECRET = serverConfig.clientSecret;
 
 export async function POST(request: NextRequest) {
   if (!API_URL || !CLIENT_ID || !CLIENT_SECRET) {

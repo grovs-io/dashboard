@@ -19,7 +19,9 @@ test.describe("Register", () => {
 
   test("shows register type selection page", async ({ page }) => {
     await page.goto("/register");
-    await expect(page.getByText(/create.*account/i)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /register with email and password/i })
+    ).toBeVisible();
   });
 
   test("email registration form has required fields", async ({ page }) => {
@@ -36,26 +38,26 @@ test.describe("Register", () => {
   test("register button is disabled without valid input", async ({ page }) => {
     await page.goto("/register/with_email");
     const registerButton = page.getByRole("button", {
-      name: /create|register|sign up/i,
+      name: /get started/i,
     });
     await expect(registerButton).toBeDisabled();
   });
 
-  test("shows password requirements checklist", async ({ page }) => {
+  test("password rules gate the submit button", async ({ page }) => {
     await page.goto("/register/with_email");
 
-    // Focus on password field to reveal checklist
-    const passwordField = page
-      .getByLabel(/^password$/i)
-      .or(page.getByPlaceholder(/password/i).first());
-    await passwordField.click();
-    await passwordField.fill("Te");
+    await page.locator("#name").fill("Test User");
+    await page.locator("#email").fill("test@example.com");
 
-    // Check for password requirements visibility
-    await expect(
-      page
-        .getByText(/character/i)
-        .or(page.getByText(/uppercase|lowercase|special|number/i).first())
-    ).toBeVisible({ timeout: 3000 });
+    const submit = page.getByRole("button", { name: /get started/i });
+
+    // 8 chars satisfies the zod schema but not the strength rules
+    await page.locator("#password").fill("password");
+    await page.locator("#password_confirm").fill("password");
+    await expect(submit).toBeDisabled();
+
+    await page.locator("#password").fill("Password1!");
+    await page.locator("#password_confirm").fill("Password1!");
+    await expect(submit).toBeEnabled();
   });
 });

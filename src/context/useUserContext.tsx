@@ -61,7 +61,10 @@ export interface UserContextType {
   enable2FA: (enable: boolean, otpCode: string) => Promise<AxiosResponse>;
   getOTPQrcode: () => Promise<AxiosResponse>;
   editUser: (data: EditUserPayload) => Promise<AxiosResponse>;
-  getSSOAuthenticationLink: (sso: string) => Promise<AxiosResponse>;
+  getSSOAuthenticationLink: (
+    sso: string,
+    body?: unknown
+  ) => Promise<AxiosResponse>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -217,8 +220,8 @@ const UserContextProvider = ({ children }: Props) => {
   }, []);
 
   const getSSOAuthenticationLink = useCallback(
-    async (sso: string): Promise<AxiosResponse> => {
-      const response = await fetchLoginWithSSOEndpointAPICall(sso);
+    async (sso: string, body?: unknown): Promise<AxiosResponse> => {
+      const response = await fetchLoginWithSSOEndpointAPICall(sso, body);
       return response;
     },
     []

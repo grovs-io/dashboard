@@ -7,6 +7,7 @@ import { useProjectSelection } from "@/context/useProjectSelection";
 import { showGenericError } from "@/lib/Notifications";
 import { cn } from "@/lib/utils";
 import CustomDomainSetup from "@/components/configuration/CustomDomainSetup";
+import { Skeleton } from "@/components/ui/skeleton";
 import MigrationEntry from "@/components/migration/MigrationEntry";
 
 import { AlertCircle, Check, Globe, Save, Undo2 } from "lucide-react";
@@ -25,11 +26,14 @@ const DomainPage = () => {
 
   const projectId = selectedProject?.id;
 
-  const { data: projectDomain } = useDomainConfigQuery(projectId);
+  const { data: projectDomain, isLoading: domainLoading } =
+    useDomainConfigQuery(projectId);
   // When a custom subdomain is active it becomes the link base URL, so it
   // takes over the Subdomain field instead of the default grovs one.
-  const { data: customDomain } = useCustomDomainQuery(projectId);
+  const { data: customDomain, isLoading: customLoading } =
+    useCustomDomainQuery(projectId);
   const customActive = customDomain?.status === "active";
+  const subdomainLoading = !projectId || domainLoading || customLoading;
 
   const setSubdomainMutation = useSetSubdomainMutation(projectId);
   const verifySubdomainMutation = useVerifySubdomainMutation(projectId);
@@ -189,7 +193,16 @@ const DomainPage = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-0 px-6 py-4 max-w-[800px]">
+            <div className="flex flex-col gap-0 px-6 pt-6 pb-16 max-w-[800px]">
+              <div className="mb-7">
+                <h2 className="text-[18px] font-semibold tracking-tight">
+                  Domain
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Control the base URL your links are served from.
+                </p>
+              </div>
+
               {/* Subdomain section */}
               <div className="flex flex-col gap-5">
                 <div className="flex items-center gap-3">
@@ -204,7 +217,21 @@ const DomainPage = () => {
                   </div>
                 </div>
 
-                {!customActive && (
+                {subdomainLoading && (
+                  <div className="flex flex-col gap-5">
+                    <Skeleton className="h-12 w-full" />
+                    <div className="flex flex-col gap-2">
+                      <Skeleton className="h-9 w-64" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Skeleton className="h-9 w-64" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                  </div>
+                )}
+
+                {!subdomainLoading && !customActive && (
                   <div className="flex flex-col gap-3">
                     <div
                       className={cn(
@@ -222,7 +249,7 @@ const DomainPage = () => {
                       <input
                         className="text-sm font-medium bg-transparent outline-none border-b border-dashed border-muted-foreground/40 focus:border-primary px-0.5 mx-0.5 transition-colors"
                         style={{
-                          width: `${Math.max(appSubdomain.length, 8)}ch`,
+                          width: `${Math.max(appSubdomain.length, 10)}ch`,
                         }}
                         placeholder="subdomain"
                         value={appSubdomain}
@@ -233,9 +260,11 @@ const DomainPage = () => {
                           setAppSubdomain(val);
                         }}
                       />
-                      <span className="text-sm text-muted-foreground select-none">
-                        .{appDomain}
-                      </span>
+                      {appDomain && (
+                        <span className="text-sm text-muted-foreground select-none">
+                          .{appDomain}
+                        </span>
+                      )}
                       <div className="ml-auto pl-3">
                         {isCurrentSettingValid && (
                           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-valid-green-light">
@@ -266,8 +295,12 @@ const DomainPage = () => {
                 )}
 
                 {/* Use your own subdomain (replaces the field when active) */}
-                <CustomDomainSetup projectId={projectId} />
-                <MigrationEntry projectId={projectId} />
+                {!subdomainLoading && (
+                  <>
+                    <CustomDomainSetup projectId={projectId} />
+                    <MigrationEntry projectId={projectId} />
+                  </>
+                )}
               </div>
             </div>
           </div>

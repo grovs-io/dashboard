@@ -1,9 +1,14 @@
 "use client";
 
 import { DateRangePicker } from "@/components/dateRangePicker/DateRangePicker";
+import { retentionMinDate } from "@/lib/analyticsLimits";
 import CustomizeColumns from "@/components/common/customize-columns";
 import { Input } from "@/components/ui/input";
-import { formatApiDate, formatShortDate } from "@/lib/dateUtils";
+import {
+  formatApiEndOfDay,
+  formatApiStartOfDay,
+  formatShortDate,
+} from "@/lib/dateUtils";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { useEffect, useMemo, useState } from "react";
 import AdsPlatformSelect from "@/components/common/ads-platform";
@@ -21,14 +26,11 @@ import { IS_ENTERPRISE } from "@/lib/edition";
 
 const ReferralsPage = () => {
   const { selectedProject, selectedInstance } = useProjectSelection();
-
-  const defaultDateRange = useMemo(() => {
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    return { from: yesterday, to: now };
-  }, []);
+  // Gated endpoints 422 past the plan window; stop the range being picked at all.
+  const retentionMin = useMemo(
+    () => retentionMinDate(selectedInstance?.analytics_retention, new Date()),
+    [selectedInstance]
+  );
 
   const {
     page,
@@ -43,7 +45,7 @@ const ReferralsPage = () => {
     setDateRange,
     platform,
     setPlatform,
-  } = useTableParams({ defaultDateRange });
+  } = useTableParams();
 
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] =
     useState<AggregatedVisitor | null>(null);
@@ -53,12 +55,12 @@ const ReferralsPage = () => {
     const params: GetVisitorsParams = {
       ascending: sort.ascending,
       page,
-      start_date: formatApiDate(dateRange.from),
+      start_date: formatApiStartOfDay(dateRange.from),
       sort_by: sort.sortKey,
       per_page: rowsPerPage,
     };
     if (searchTerm !== "") params.term = searchTerm;
-    if (dateRange.to) params.end_date = formatApiDate(dateRange.to);
+    if (dateRange.to) params.end_date = formatApiEndOfDay(dateRange.to);
     if (platform !== "") params.platform = platform;
     return params;
   }, [
@@ -201,7 +203,11 @@ const ReferralsPage = () => {
                   selectedColumns={selectedColumns}
                   setSelectedColumns={setSelectedColumns}
                 />
-                <DateRangePicker date={dateRange} setDate={setDateRange} />
+                <DateRangePicker
+                  date={dateRange}
+                  setDate={setDateRange}
+                  minDate={retentionMin}
+                />
               </div>
             </div>
             <div className="overflow-auto">

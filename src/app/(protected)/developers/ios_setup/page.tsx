@@ -36,6 +36,7 @@ import {
   showSuccessNotification,
 } from "@/lib/Notifications";
 import { ApiError } from "@/lib/ApiError";
+import { config as runtimeConfig } from "@/lib/config";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { useInstanceConfigQuery } from "@/hooks/queries/useInstanceQueries";
 import { useCustomDomainsQuery } from "@/hooks/queries/useConfigurationQueries";
@@ -160,7 +161,9 @@ const SetupOverview = ({
             />
           </div>
           <div className="flex flex-col gap-0.5 flex-1">
-            <span className="text-sm font-semibold">iOS Setup</span>
+            <span className="text-[18px] font-semibold tracking-tight">
+              iOS Setup
+            </span>
             <span className="text-xs text-muted-foreground">
               Your iOS SDK is configured and ready to use.
             </span>
@@ -633,17 +636,22 @@ const IosSetupPage = () => {
     };
   }, [hasAnyChanges, router]);
 
-  // Mark all steps visited for returning users, auto-enter wizard for first-time
+  // Mark all steps visited for returning users, auto-enter wizard for first-time.
+  // Reads instanceConfig directly: sdkConfigured lags one render behind (set via effect),
+  // so branching on it here would force wizard mode for configured users on every load.
   useEffect(() => {
     if (!instanceConfig) return;
-    if (sdkConfigured) {
+    const found = instanceConfig.find(
+      (config: PlatformAppConfig) => config.platform === IOS
+    );
+    if (found?.configuration?.bundle_id) {
       setVisitedSteps(ALL_STEP_INDICES);
     } else {
       setCurrentStep(0);
       setVisitedSteps(new Set([0]));
       setWizardMode(true);
     }
-  }, [sdkConfigured, instanceConfig]);
+  }, [instanceConfig]);
 
   // Deep-link from elsewhere (e.g. the custom domain modal): jump straight to
   // the requested step once instanceConfig is ready. Only applies once.
@@ -958,18 +966,22 @@ const IosSetupPage = () => {
     if (!selectedInstance) return;
     setUrlScheme(selectedInstance.uri_scheme);
 
-    setAssociatedDomainProd("applinks:" + selectedInstance.production.domain);
-    setAssociatedDomainTest("applinks:" + selectedInstance.test.domain);
+    setAssociatedDomainProd(
+      "applinks:" + (selectedInstance.production?.domain ?? "")
+    );
+    setAssociatedDomainTest(
+      "applinks:" + (selectedInstance.test?.domain ?? "")
+    );
 
-    const URL = process.env.NEXT_PUBLIC_API_URL;
+    const URL = runtimeConfig.apiUrl;
 
     setAppstoreURLSandbox(
-      URL + "/api/v1/iap/apple/test/" + selectedInstance.test.hash_id
+      URL + "/api/v1/iap/apple/test/" + (selectedInstance.test?.hash_id ?? "")
     );
     setAppstoreURLProduction(
       URL +
         "/api/v1/iap/apple/production/" +
-        selectedInstance.production.hash_id
+        (selectedInstance.production?.hash_id ?? "")
     );
 
     if (!config || !config.configuration) {
@@ -985,7 +997,8 @@ const IosSetupPage = () => {
       setAppleAppPrefix(cfg?.app_prefix ?? "");
       if (cfg?.push_configuration) {
         setCertificate(cfg.push_configuration.certificate ?? null);
-        setCertificatePassword(String(cfg.push_configuration.key_id ?? ""));
+        // Password is write-only — the backend never returns it. Re-enter it to change the cert.
+        setCertificatePassword("");
       } else {
         setCertificate(null);
         setCertificatePassword("");

@@ -53,6 +53,7 @@ import {
   showSuccessNotification,
 } from "@/lib/Notifications";
 import { ApiError } from "@/lib/ApiError";
+import { config as runtimeConfig } from "@/lib/config";
 import { shaSchema } from "@/schemas/shared";
 import { IS_ENTERPRISE } from "@/lib/edition";
 import {
@@ -176,7 +177,9 @@ const SetupOverview = ({
             />
           </div>
           <div className="flex flex-col gap-0.5 flex-1">
-            <span className="text-sm font-semibold">Android Setup</span>
+            <span className="text-[18px] font-semibold tracking-tight">
+              Android Setup
+            </span>
             <span className="text-xs text-muted-foreground">
               Your Android SDK is configured and ready to use.
             </span>
@@ -654,18 +657,22 @@ const AndroidSetupPage = () => {
     };
   }, [hasAnyChanges, router]);
 
-  // Mark all steps visited for returning users, auto-enter wizard for first-time
+  // Mark all steps visited for returning users, auto-enter wizard for first-time.
+  // Reads instanceConfig directly: sdkConfigured lags one render behind (set via effect),
+  // so branching on it here would force wizard mode for configured users on every load.
   useEffect(() => {
     if (!instanceConfig) return;
-    if (sdkConfigured) {
+    const found = instanceConfig.find(
+      (config: PlatformAppConfig) => config.platform === ANDROID
+    );
+    if (found?.configuration?.identifier) {
       setVisitedSteps(ALL_STEP_INDICES);
     } else {
-      // First-time user — reset visited steps and go to wizard
       setCurrentStep(0);
       setVisitedSteps(new Set([0]));
       setWizardMode(true);
     }
-  }, [sdkConfigured, instanceConfig]);
+  }, [instanceConfig]);
 
   // Deep-link from elsewhere (e.g. the custom domain modal): jump straight to
   // the requested step once instanceConfig is ready. Only applies once.
@@ -765,7 +772,7 @@ const AndroidSetupPage = () => {
   };
 
   const initializeValues = (config: PlatformAppConfig | null) => {
-    const URL = process.env.NEXT_PUBLIC_API_URL;
+    const URL = runtimeConfig.apiUrl;
     setAppstoreWebhookURL(
       URL + "/api/v1/iap/google/" + selectedInstance?.hash_id
     );

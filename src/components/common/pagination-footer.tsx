@@ -30,6 +30,12 @@ export const PaginationFooter = ({
   setPage: (value: number) => void;
 }) => {
   const pageSizes = [10, 25, 50, 100];
+  const canGoBack = page > 1;
+  const canGoForward = page < pageCount;
+  const goToPage = (targetPage: number) => {
+    const nextPage = Math.min(Math.max(targetPage, 1), pageCount);
+    if (nextPage !== page) setPage(nextPage);
+  };
 
   return (
     <div className="flex justify-between items-center px-4 py-3 text-sm w-full justify-between mt-auto">
@@ -44,7 +50,6 @@ export const PaginationFooter = ({
             value={String(rowsPerPage)}
             onValueChange={(v) => {
               setRowsPerPage(Number(v));
-              setPage(1);
             }}
           >
             <SelectTrigger className="w-[70px] border rounded px-2 py-1 text-sm">
@@ -68,29 +73,37 @@ export const PaginationFooter = ({
         {/* Pagination buttons */}
         <div className="flex gap-2">
           <button
-            onClick={() => setPage(1)}
-            disabled={page - 1 === 0}
+            type="button"
+            aria-label="Go to first page"
+            onClick={() => goToPage(1)}
+            disabled={!canGoBack}
             className="px-2 py-1 border rounded disabled:opacity-30"
           >
             <ChevronFirst />
           </button>
           <button
-            onClick={() => setPage(page - 1)}
-            disabled={page - 1 === 0}
+            type="button"
+            aria-label="Go to previous page"
+            onClick={() => goToPage(page - 1)}
+            disabled={!canGoBack}
             className="px-2 py-1 border rounded disabled:opacity-30"
           >
             <ChevronLeft />
           </button>
           <button
-            onClick={() => setPage(page + 1)}
-            disabled={page + 1 > pageCount}
+            type="button"
+            aria-label="Go to next page"
+            onClick={() => goToPage(page + 1)}
+            disabled={!canGoForward}
             className="px-2 py-1 border rounded disabled:opacity-30"
           >
             <ChevronRight />
           </button>
           <button
-            onClick={() => setPage(pageCount)}
-            disabled={page + 1 > pageCount}
+            type="button"
+            aria-label="Go to last page"
+            onClick={() => goToPage(pageCount)}
+            disabled={!canGoForward}
             className="px-2 py-1 border rounded disabled:opacity-30"
           >
             <ChevronLast />

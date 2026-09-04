@@ -417,10 +417,12 @@ const SocialMediaPreviewPage = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-0 px-6 py-4 max-w-[600px]">
-              <div className="flex flex-col gap-0.5 mb-6">
-                <h2 className="text-sm font-semibold">Social Media Preview</h2>
-                <p className="text-xs text-muted-foreground">
+            <div className="flex flex-col gap-0 px-6 pt-6 pb-16 max-w-[600px]">
+              <div className="mb-7">
+                <h2 className="text-[18px] font-semibold tracking-tight">
+                  Social Media Preview
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
                   Customize how your links appear when shared on social
                   platforms.
                 </p>

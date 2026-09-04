@@ -112,6 +112,16 @@ export const addCustomDomainWithPurposeAPICall = async (
   });
 };
 
+// Shares the 10/min ops throttle with add/remove — a button, never a poll.
+export const verifyCustomDomainAPICall = async (
+  projectId: string,
+  hostname: string
+): Promise<AxiosResponse<CustomDomainResponse>> => {
+  return POST(config.apiPath + `/projects/${projectId}/custom_domains/verify`, {
+    hostname,
+  });
+};
+
 export const removeCustomDomainByPurposeAPICall = async (
   projectId: string,
   purpose: CustomDomainPurpose

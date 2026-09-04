@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  acceptInviteSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
@@ -92,6 +93,26 @@ describe("registerSchema", () => {
       email: "bad-email",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("acceptInviteSchema", () => {
+  const validAccount = {
+    name: "Dragos Appssemble",
+    password: "Password1!",
+    password_confirm: "Password1!",
+  };
+
+  it("accepts an invitation form without an email", () => {
+    expect(
+      acceptInviteSchema.safeParse({ ...validAccount, email: "" }).success
+    ).toBe(true);
+  });
+
+  it("does not make regular registration accept a blank email", () => {
+    expect(
+      registerSchema.safeParse({ ...validAccount, email: "" }).success
+    ).toBe(false);
   });
 });
 

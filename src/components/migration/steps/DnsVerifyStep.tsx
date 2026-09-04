@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import DnsSetupChecklist, {
   dnsSetupStepsComplete,
 } from "@/components/common/dns-setup-checklist";
+import ManualVerifyPanel from "@/components/common/ManualVerifyPanel";
 import { isCustomDomainFailedLike } from "@/lib/customDomainStatus";
 import { normalizeVerificationErrors } from "@/lib/verificationErrors";
 import type { CustomDomain, CustomDomainPreflight } from "@/types";
@@ -17,6 +18,10 @@ interface DnsVerifyStepProps {
   onRecheck: () => void;
   recheckPending: boolean;
   retryAfterSeconds?: number;
+  manualMode?: boolean;
+  onVerify: () => void;
+  verifyPending?: boolean;
+  verifyNotice?: string | null;
 }
 
 const DnsVerifyStep = ({
@@ -26,16 +31,28 @@ const DnsVerifyStep = ({
   onRecheck,
   recheckPending,
   retryAfterSeconds,
+  manualMode = false,
+  onVerify,
+  verifyPending = false,
+  verifyNotice = null,
 }: DnsVerifyStepProps) => {
   const errors = normalizeVerificationErrors(domain.verification_errors);
   const isFailedLike = isCustomDomainFailedLike(domain);
   const isPendingLike =
-    !isFailedLike && !dnsSetupStepsComplete(domain, preflight);
-  const statusLabel = isFailedLike
-    ? "Setup failed"
-    : isPendingLike
-      ? "Checking setup"
-      : "Setup complete";
+    !isFailedLike &&
+    (manualMode
+      ? domain.status !== "active"
+      : !dnsSetupStepsComplete(domain, preflight));
+  const manualSuspended = manualMode && domain.status === "suspended";
+  const statusLabel = manualSuspended
+    ? "Removing"
+    : isFailedLike
+      ? "Setup failed"
+      : isPendingLike
+        ? manualMode
+          ? "Pending"
+          : "Checking setup"
+        : "Setup complete";
 
   // Two reasons a recheck can be unavailable: a request is already in flight,
   // or the server told us (via Retry-After) to back off. The countdown takes
@@ -65,11 +82,28 @@ const DnsVerifyStep = ({
 
       <DnsSetupChecklist
         domain={domain}
+        manualMode={manualMode}
         preflight={preflight}
         preflightPending={preflightPending}
       />
 
-      {isPendingLike && (
+      {manualMode && !manualSuspended && (isPendingLike || isFailedLike) && (
+        <ManualVerifyPanel
+          errors={domain.verification_errors}
+          notice={verifyNotice}
+          onVerify={onVerify}
+          verifyPending={verifyPending}
+        />
+      )}
+
+      {manualSuspended && (
+        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+          This hostname is being removed. It will disappear from here shortly.
+        </div>
+      )}
+
+      {!manualMode && isPendingLike && (
         <div className="inline-flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
           <Loader2 className="mt-0.5 h-3.5 w-3.5 animate-spin shrink-0" />
           <div className="flex flex-col gap-0.5">
@@ -81,7 +115,7 @@ const DnsVerifyStep = ({
         </div>
       )}
 
-      {isFailedLike && (
+      {isFailedLike && !manualMode && (
         <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>SSL didn&apos;t issue within 72h.</AlertTitle>

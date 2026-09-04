@@ -21,6 +21,17 @@ export interface SSORedirectResponse {
   redirect_url: string;
 }
 
+export const SSO_PROVIDERS = ["google_oauth2", "microsoft_graph"] as const;
+export type SSOProvider = (typeof SSO_PROVIDERS)[number];
+// Enterprise OIDC connections (ee/); started with a connection id instead of a global provider.
+export const ENTERPRISE_SSO = "oidc" as const;
+export type SSOLogin = SSOProvider | typeof ENTERPRISE_SSO;
+
+export interface SSOProvidersResponse {
+  sso_enabled: boolean;
+  providers: SSOProvider[];
+}
+
 export const signInAPICall = async (
   email: string,
   password: string,
@@ -42,19 +53,17 @@ export const logoutAPICall = async (token: string): Promise<AxiosResponse> => {
   return axios.post("/api/auth/revoke", { token });
 };
 
+// Same-origin server routes attach the client id server-side (see api/auth/*).
 export const acceptInviteAPICall = async (
   invitationToken: string,
   name: string,
   password: string
 ): Promise<AxiosResponse<AuthTokenResponse>> => {
-  const data = {
-    name: name,
+  return axios.post<AuthTokenResponse>("/api/auth/accept-invite", {
     invitation_token: invitationToken,
-    password: password,
-    client_id: config.clientId,
-  };
-
-  return POST(config.apiPath + "/users/accept_invite", data);
+    name,
+    password,
+  });
 };
 
 export const createAccountAPICall = async (
@@ -62,14 +71,11 @@ export const createAccountAPICall = async (
   password: string,
   name: string
 ): Promise<AxiosResponse<AuthTokenResponse>> => {
-  const data = {
-    email: email,
-    password: password,
-    name: name,
-    client_id: config.clientId,
-  };
-
-  return POST(config.apiPath + "/users", data);
+  return axios.post<AuthTokenResponse>("/api/auth/signup", {
+    email,
+    password,
+    name,
+  });
 };
 
 export const resetPasswordAPICall = async (
@@ -128,8 +134,13 @@ export const editUserAPICall = async (
 };
 
 export const fetchLoginWithSSOEndpointAPICall = async (
-  sso: string
+  sso: string,
+  body: unknown = null
 ): Promise<AxiosResponse<SSORedirectResponse>> => {
   const path = config.apiPath + "/identity/sso/auth/" + sso;
-  return POST(path, null);
+  return POST(path, body, { retry: false });
 };
+
+export const fetchSSOProvidersAPICall = async (): Promise<
+  AxiosResponse<SSOProvidersResponse>
+> => GET(config.apiPath + "/identity/sso/providers");

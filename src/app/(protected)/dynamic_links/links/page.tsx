@@ -1,6 +1,7 @@
 "use client";
 
 import { DateRangePicker } from "@/components/dateRangePicker/DateRangePicker";
+import { retentionMinDate } from "@/lib/analyticsLimits";
 import LinksTable from "@/components/dynamic_links/links/LinksTable";
 import { getLinksTableColumns } from "@/components/dynamic_links/links/LinksTableColumns";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,11 @@ import { useUrlState } from "@/hooks/useUrlState";
 
 const LinksPage = ({ campaignId }: { campaignId?: string }) => {
   const { selectedInstance, selectedProject } = useProjectSelection();
+  // Gated endpoints 422 past the plan window; stop the range being picked at all.
+  const retentionMin = useMemo(
+    () => retentionMinDate(selectedInstance?.analytics_retention, new Date()),
+    [selectedInstance]
+  );
   const archiveCampaignMutation = useArchiveCampaignMutation(
     selectedProject?.id
   );
@@ -104,7 +110,9 @@ const LinksPage = ({ campaignId }: { campaignId?: string }) => {
   const links = linksQuery.data?.data;
   const totalPages = linksQuery.data?.totalPages ?? 0;
   const totalRows = linksQuery.data?.totalEntries ?? 0;
-  const tableLoading = linksQuery.isLoading;
+  // Show skeleton rows while the query is disabled (project/date range not yet
+  // ready) or still resolving, so we never flash the empty state on first load.
+  const tableLoading = !linksQueryParams || linksQuery.isPending;
 
   const columnOptions = [
     { label: "Views", value: "views" },
@@ -273,8 +281,6 @@ const LinksPage = ({ campaignId }: { campaignId?: string }) => {
                   </Popover>
                 )}
 
-                <DateRangePicker date={dateRange} setDate={setDateRange} />
-
                 <AdsPlatformSelect
                   platformAdsOptions={adsFilterList}
                   selectedAdsPlatform={adsFilter}
@@ -302,6 +308,11 @@ const LinksPage = ({ campaignId }: { campaignId?: string }) => {
                     Archive
                   </Button>
                 )}
+                <DateRangePicker
+                  date={dateRange}
+                  setDate={setDateRange}
+                  minDate={retentionMin}
+                />
                 <Button
                   variant="outline"
                   className="shadow-none"

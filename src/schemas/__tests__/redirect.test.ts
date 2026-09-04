@@ -9,12 +9,14 @@ describe("redirectRulesSchema", () => {
       appStore: true,
       customUrl: "",
       showPreview: false,
+      copyToClipboard: false,
     },
     ios: {
       enabled: true,
       appStore: true,
       customUrl: "",
       showPreview: false,
+      copyToClipboard: false,
     },
     desktop: {
       generatedPage: true,
@@ -46,12 +48,14 @@ describe("redirectRulesSchema", () => {
         appStore: false,
         customUrl: "",
         showPreview: false,
+        copyToClipboard: false,
       },
       ios: {
         enabled: false,
         appStore: true,
         customUrl: "",
         showPreview: false,
+        copyToClipboard: false,
       },
       desktop: { generatedPage: true, customUrl: "" },
     });

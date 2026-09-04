@@ -6,23 +6,6 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-const chatwootUrl = process.env.NEXT_PUBLIC_CHATWOOT_URL ?? "";
-
-const cspDirectives = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://www.googletagmanager.com https://*.posthog.com ${chatwootUrl}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  // NOTE: 'unsafe-inline' in script-src is a known limitation; nonce-based CSP is a larger follow-up
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' https://fonts.gstatic.com",
-  `connect-src 'self' ${apiUrl} https://*.posthog.com https://*.google-analytics.com https://www.googletagmanager.com https://api.github.com ${chatwootUrl}`,
-  `frame-src 'self' https://www.googletagmanager.com ${chatwootUrl}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-];
-
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -36,14 +19,23 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
-  {
-    key: "Content-Security-Policy",
-    value: cspDirectives.join("; "),
-  },
 ];
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
+  env: {
+    NEXT_PUBLIC_DOCS_URL:
+      process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.grovs.io",
+  },
+  // Self-hosted containers use Next's traced standalone server so the runtime
+  // image contains neither source files nor the full development dependency tree.
+  output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
+  // Pin Turbopack's workspace root to this project. A stray package-lock.json
+  // in the home directory otherwise makes Next infer the wrong root, which
+  // breaks module resolution/routing (all routes 404).
+  turbopack: {
+    root: __dirname,
+  },
   // output: "export",
   images: {
     unoptimized: true, // ✅ disables Image Optimization

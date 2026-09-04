@@ -21,13 +21,6 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("react-password-checklist", () => ({
-  default: ({ onChange }: { onChange: (valid: boolean) => void }) => {
-    void onChange;
-    return <div data-testid="password-checklist">Password Checklist</div>;
-  },
-}));
-
 function TestRegisterForm(
   overrides: Partial<Parameters<typeof RegisterForm>[0]> = {}
 ) {

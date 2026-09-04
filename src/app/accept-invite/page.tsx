@@ -3,12 +3,12 @@ import { useUserContext } from "@/context/useUserContext";
 import { useState } from "react";
 import { RegisterForm } from "@/components/registerForm/RegisterForm";
 import { showErrorNotification } from "@/lib/Notifications";
-import { ApiError } from "@/lib/ApiError";
+import { getApiErrorInfo, getSsoRefusal } from "@/lib/ApiError";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema, type RegisterFormValues } from "@/schemas/auth";
+import { acceptInviteSchema, type RegisterFormValues } from "@/schemas/auth";
 
 const Page = () => {
   const { acceptInvitation } = useUserContext();
@@ -19,7 +19,7 @@ const Page = () => {
   const router = useRouter();
 
   const form = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(acceptInviteSchema),
     mode: "onChange",
     defaultValues: {
       name: "",
@@ -41,11 +41,13 @@ const Page = () => {
       await acceptInvitation(invitationToken ?? "", data.name, data.password);
       router.replace("/dashboard");
     } catch (error) {
-      showErrorNotification(
-        error instanceof ApiError
-          ? error.message
-          : "Something went wrong, please try again"
-      );
+      const refusal = getSsoRefusal(error);
+      if (refusal) {
+        showErrorNotification(refusal.error);
+        router.replace(`/login?email=${encodeURIComponent(data.email)}`);
+        return;
+      }
+      showErrorNotification(getApiErrorInfo(error).message);
     }
   };
 

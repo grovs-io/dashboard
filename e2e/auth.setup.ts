@@ -12,8 +12,9 @@ setup("authenticate", async ({ page }) => {
     ({ tokens, user }) => {
       localStorage.setItem("access_token", tokens.access_token);
       localStorage.setItem("refresh_token", tokens.refresh_token);
+      // key must match LocalStorage.setCurrentUser
       localStorage.setItem(
-        "user",
+        "current_user",
         JSON.stringify({
           id: user.id,
           email: user.email,

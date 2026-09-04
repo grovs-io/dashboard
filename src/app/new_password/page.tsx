@@ -1,7 +1,8 @@
 "use client";
 import { useUserContext } from "@/context/useUserContext";
 import { useRef, useState } from "react";
-import { showGenericError } from "@/lib/Notifications";
+import { showErrorNotification, showGenericError } from "@/lib/Notifications";
+import { getSsoRefusal } from "@/lib/ApiError";
 import { useRouter, useSearchParams } from "next/navigation";
 import { NewPasswordForm } from "@/components/newPasswordForm/NewPasswordForm";
 
@@ -41,7 +42,13 @@ const Page = () => {
       try {
         await changePassword(resetTokenRef.current, data.password);
         router.replace("/login");
-      } catch {
+      } catch (error) {
+        const refusal = getSsoRefusal(error);
+        if (refusal) {
+          showErrorNotification(refusal.error);
+          router.replace("/login");
+          return;
+        }
         showGenericError();
       }
     }

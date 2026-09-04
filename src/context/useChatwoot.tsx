@@ -10,6 +10,7 @@ import {
   useState,
   ReactNode,
 } from "react";
+import { CHATWOOT_ENABLED } from "@/lib/integrations";
 
 /* ---------------------------------------------
    Extend window types for Chatwoot 
@@ -70,6 +71,8 @@ export const ChatwootProvider = ({ children }: ChatwootProviderProps) => {
      Load Chatwoot Script
   ---------------------------------------------- */
   useEffect(() => {
+    if (!CHATWOOT_ENABLED) return;
+
     const BASE_URL = process.env.NEXT_PUBLIC_CHATWOOT_URL;
     const TOKEN = process.env.NEXT_PUBLIC_CHATWOOT_TOKEN;
     if (!BASE_URL || !TOKEN) return;

@@ -10,11 +10,11 @@ RUN npm ci
 # Copy rest of the app
 COPY . .
 
-# Copy the example env file as default .env (override with your own at runtime)
-COPY .env.example .env
+# Copy the test env file as default .env
+COPY .env.production .env
 
-# Build for production
-RUN npx cross-env NEXT_PUBLIC_ENV=production npm run build:prod
+# Build using the test environment
+RUN npx dotenv -e .env.production -- npx cross-env NEXT_PUBLIC_ENV=production npm run build:prod
 
 # Expose default Next.js port
 EXPOSE 3000
@@ -25,5 +25,5 @@ RUN apk add --no-cache curl
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/ || exit 1
 
-# Start the production server
-CMD ["npm", "run", "start"]
+# Run using the test env again at runtime
+CMD ["sh", "-c", "npx dotenv -e .env.production -- npx cross-env NEXT_PUBLIC_ENV=production npm run start"]

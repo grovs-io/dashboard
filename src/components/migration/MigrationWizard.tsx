@@ -15,21 +15,30 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useCustomDomainPreflightQuery,
-  useCustomDomainsQuery,
+  useCustomDomainsEnvelopeQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import { useMigrationSourceQuery } from "@/hooks/queries/useMigrationQueries";
-import { useRemoveCustomDomainMutation } from "@/hooks/mutations/useConfigurationMutations";
+import {
+  useRemoveCustomDomainMutation,
+  useVerifyCustomDomainMutation,
+} from "@/hooks/mutations/useConfigurationMutations";
 import {
   useCreateMigrationMutation,
   useDeleteMigrationSourceMutation,
   useTestMigrationSourceMutation,
+  useUpdateMigrationSourceMutation,
 } from "@/hooks/mutations/useMigrationMutations";
 import { showErrorNotification } from "@/lib/Notifications";
-import { CUSTOM_DOMAIN_PREFLIGHT_POLL_MS } from "@/lib/customDomainStatus";
+import {
+  CUSTOM_DOMAIN_PREFLIGHT_POLL_MS,
+  isManualCustomDomainMode,
+} from "@/lib/customDomainStatus";
+import { verifyFailureNotice } from "@/components/common/ManualVerifyPanel";
 import { migrationErrorToCopy } from "@/lib/migrationErrorToCopy";
 import { ApiError } from "@/lib/ApiError";
 import { getApiErrorStatus } from "@/lib/apiErrorHelpers";
 import { deriveStep } from "./deriveStep";
+import { buildCreateMigrationPayload } from "./migrationPayload";
 import { useLocalAttestation } from "./useLocalAttestation";
 import CancelMigrationButton from "./CancelMigrationButton";
 import StartStep from "./steps/StartStep";
@@ -78,19 +87,27 @@ const MigrationWizard = ({
 }: MigrationWizardProps) => {
   const attestations = useLocalAttestation(projectId);
 
-  const domainsQuery = useCustomDomainsQuery(projectId);
+  const domainsQuery = useCustomDomainsEnvelopeQuery(projectId);
+  const domains = domainsQuery.data?.custom_domains;
+  const manualMode = isManualCustomDomainMode(domainsQuery.data?.tls_mode);
   const sourceQuery = useMigrationSourceQuery(projectId);
 
   const removeDomainMutation = useRemoveCustomDomainMutation(projectId);
+  const verifyDomainMutation = useVerifyCustomDomainMutation(projectId);
   const createMigrationMutation = useCreateMigrationMutation(projectId);
   const deleteSourceMutation = useDeleteMigrationSourceMutation(projectId);
   const testSourceMutation = useTestMigrationSourceMutation(projectId);
+  const updateSourceMutation = useUpdateMigrationSourceMutation(projectId);
 
   const [hostnameForPreflight, setHostnameForPreflight] = useState("");
   const [debouncedHostname, setDebouncedHostname] = useState("");
   const [hostnameFieldError, setHostnameFieldError] = useState<string | null>(
     null
   );
+  const [startProviderHosted, setStartProviderHosted] = useState(false);
+  const [extraHostsFieldError, setExtraHostsFieldError] = useState<
+    string | null
+  >(null);
   const [billingBlocked, setBillingBlocked] = useState(false);
   const [featureHidden, setFeatureHidden] = useState(false);
 
@@ -132,12 +149,14 @@ const MigrationWizard = ({
     ? getApiErrorStatus(sourceQuery.error)
     : undefined;
 
+  const sourceIsProviderHosted = sourceQuery.data?.provider_hosted === true;
+
   const step = useMemo(
     () =>
       deriveStep({
         domainsLoading: domainsQuery.isLoading,
         sourceLoading: sourceQuery.isLoading,
-        domains: domainsQuery.data,
+        domains,
         source: sourceQuery.data,
         sourceErrorStatus,
         attestations: {
@@ -147,14 +166,14 @@ const MigrationWizard = ({
     [
       domainsQuery.isLoading,
       sourceQuery.isLoading,
-      domainsQuery.data,
+      domains,
       sourceQuery.data,
       sourceErrorStatus,
       attestations.preflightDone,
     ]
   );
 
-  const migrationRow: CustomDomain | undefined = domainsQuery.data?.find(
+  const migrationRow: CustomDomain | undefined = domains?.find(
     (d) => d.purpose === "migration"
   );
 
@@ -170,20 +189,30 @@ const MigrationWizard = ({
     activePreflightHostname,
     {
       enabled:
-        step === "dns_verify" ||
-        step === "dns_failed" ||
-        step === "cutover" ||
-        step === "managed" ||
-        debouncedHostname.length > 0,
+        !startProviderHosted &&
+        !sourceIsProviderHosted &&
+        !manualMode &&
+        (step === "dns_verify" ||
+          step === "dns_failed" ||
+          step === "cutover" ||
+          step === "managed" ||
+          debouncedHostname.length > 0),
       refetchInterval:
-        step === "dns_verify" || step === "cutover" || step === "managed"
+        !startProviderHosted &&
+        !sourceIsProviderHosted &&
+        !manualMode &&
+        (step === "dns_verify" || step === "cutover" || step === "managed")
           ? CUSTOM_DOMAIN_PREFLIGHT_POLL_MS
           : false,
     }
   );
 
+  // Manual mode: "active" is authoritative, preflight is advisory only.
   const effectiveStep =
-    step === "managed" && preflightQuery.data?.cname_matches !== true
+    step === "managed" &&
+    !manualMode &&
+    !sourceIsProviderHosted &&
+    preflightQuery.data?.cname_matches !== true
       ? "dns_verify"
       : step;
 
@@ -219,18 +248,27 @@ const MigrationWizard = ({
       provider,
       hostname,
       credentials,
+      providerHosted,
+      extraHosts,
     }: {
       provider: MigrationProvider;
       hostname: string;
       credentials: MigrationCredentials;
+      providerHosted: boolean;
+      extraHosts: string[];
     }) => {
       try {
         setHostnameFieldError(null);
-        await createMigrationMutation.mutateAsync({
-          hostname,
-          provider,
-          credentials,
-        });
+        setExtraHostsFieldError(null);
+        await createMigrationMutation.mutateAsync(
+          buildCreateMigrationPayload({
+            provider,
+            hostname,
+            credentials,
+            providerHosted,
+            extraHosts,
+          })
+        );
       } catch (err) {
         const status = getApiErrorStatus(err);
         const message =
@@ -243,6 +281,10 @@ const MigrationWizard = ({
             : err instanceof Error
               ? err.message
               : "";
+        const serverError =
+          err instanceof ApiError && err.data && typeof err.data === "object"
+            ? (err.data as { error?: string }).error
+            : undefined;
         if (
           (status === 400 || status === 422) &&
           /missing keys|valid bare hostname/i.test(message)
@@ -251,6 +293,16 @@ const MigrationWizard = ({
             /valid bare hostname/i.test(message)
               ? "Enter a valid bare hostname"
               : "Check the highlighted credential fields"
+          );
+          return;
+        }
+        if (status === 422 && /extra.?hosts/i.test(message)) {
+          setExtraHostsFieldError(serverError ?? "Check the extra hosts field");
+          return;
+        }
+        if (status === 422 && /self-hosted deployments/i.test(message)) {
+          showErrorNotification(
+            "Provider-hosted migration isn't available on this deployment."
           );
           return;
         }
@@ -287,7 +339,9 @@ const MigrationWizard = ({
         }
         if (status === 502) {
           showErrorNotification(
-            "Cloudflare is having issues — try again in a few seconds."
+            manualMode
+              ? "The server is having issues — try again in a few seconds."
+              : "Cloudflare is having issues — try again in a few seconds."
           );
           return;
         }
@@ -300,8 +354,20 @@ const MigrationWizard = ({
       sourceQuery,
       setSubmitBackoff,
       handleApiError,
+      manualMode,
     ]
   );
+
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
+  const handleVerifyNow = useCallback(async () => {
+    if (!migrationRow) return;
+    setVerifyNotice(null);
+    try {
+      await verifyDomainMutation.mutateAsync(migrationRow.hostname);
+    } catch (err) {
+      setVerifyNotice(verifyFailureNotice(err));
+    }
+  }, [migrationRow, verifyDomainMutation]);
 
   const handleRecheck = useCallback(async () => {
     if (!migrationRow) return;
@@ -328,7 +394,9 @@ const MigrationWizard = ({
       } catch (err) {
         if (getApiErrorStatus(err) !== 404) throw err;
       }
-      await removeDomainMutation.mutateAsync("migration");
+      if (!sourceIsProviderHosted) {
+        await removeDomainMutation.mutateAsync("migration");
+      }
       attestations.clearAll();
       onMigrationCancelled?.();
       return true;
@@ -339,6 +407,7 @@ const MigrationWizard = ({
   }, [
     deleteSourceMutation,
     removeDomainMutation,
+    sourceIsProviderHosted,
     attestations,
     handleApiError,
     onMigrationCancelled,
@@ -360,7 +429,9 @@ const MigrationWizard = ({
         // 404 = source already gone; cascade may have removed it.
         if (getApiErrorStatus(err) !== 404) throw err;
       }
-      await removeDomainMutation.mutateAsync("migration");
+      if (!sourceIsProviderHosted) {
+        await removeDomainMutation.mutateAsync("migration");
+      }
       attestations.clearAll();
       onMigrationCancelled?.();
     } catch (err) {
@@ -369,6 +440,7 @@ const MigrationWizard = ({
   }, [
     deleteSourceMutation,
     removeDomainMutation,
+    sourceIsProviderHosted,
     attestations,
     handleApiError,
     onMigrationCancelled,
@@ -422,6 +494,22 @@ const MigrationWizard = ({
     );
   }
 
+  if (
+    effectiveStep === "start" &&
+    manualMode &&
+    (domainsQuery.data?.ingress_host ?? null) == null
+  ) {
+    return (
+      <Alert>
+        <ShieldAlert />
+        <AlertTitle>
+          This deployment isn&apos;t configured for custom domains — contact
+          your administrator.
+        </AlertTitle>
+      </Alert>
+    );
+  }
+
   if (effectiveStep === "start") {
     // No-confirm mode — the cancel button sits inside the form's footer row.
     return (
@@ -431,9 +519,13 @@ const MigrationWizard = ({
           isSubmitting={createMigrationMutation.isPending}
           disabledUntilSeconds={retryAfterSeconds}
           hostnameFieldError={hostnameFieldError}
+          extraHostsFieldError={extraHostsFieldError}
           onHostnameChange={setHostnameForPreflight}
-          preflight={preflightQuery.data ?? null}
-          preflightLoading={preflightQuery.isLoading}
+          onProviderHostedChange={setStartProviderHosted}
+          preflight={startProviderHosted ? null : (preflightQuery.data ?? null)}
+          preflightLoading={
+            startProviderHosted ? false : preflightQuery.isLoading
+          }
           cancelSlot={startCancelButton}
         />
         <AlertDialog open={billingBlocked} onOpenChange={setBillingBlocked}>
@@ -462,7 +554,7 @@ const MigrationWizard = ({
   }
 
   const destructiveCancelFooter = (
-    <div className="flex justify-end border-t border-sidebar-border pt-3">
+    <div className="sticky bottom-0 z-10 -mx-1 -mb-1 flex justify-end border-t border-sidebar-border bg-background px-1 pt-3 pb-1">
       {destructiveCancelButton}
     </div>
   );
@@ -475,6 +567,10 @@ const MigrationWizard = ({
       <div className="flex flex-col gap-4">
         <DnsVerifyStep
           domain={migrationRow}
+          manualMode={manualMode}
+          onVerify={handleVerifyNow}
+          verifyPending={verifyDomainMutation.isPending}
+          verifyNotice={verifyNotice}
           preflight={preflightQuery.data ?? null}
           preflightPending={preflightQuery.isFetching}
           onRecheck={handleRecheck}
@@ -511,6 +607,9 @@ const MigrationWizard = ({
       source={sourceQuery.data}
       domain={migrationRow ?? null}
       onRemoveAll={handleRemoveAll}
+      onUpdateExtraHosts={async (hosts) => {
+        await updateSourceMutation.mutateAsync({ extra_hosts: hosts });
+      }}
     />
   );
 };

@@ -146,11 +146,13 @@ const CutoverStep = ({
             value={domain.hostname}
             onCopy={() => handleCopyText(domain.hostname)}
           />
-          <DnsRow
-            label="Target"
-            value={domain.cname_target}
-            onCopy={() => handleCopyText(domain.cname_target)}
-          />
+          {domain.cname_target && (
+            <DnsRow
+              label="Target"
+              value={domain.cname_target}
+              onCopy={() => handleCopyText(domain.cname_target ?? "")}
+            />
+          )}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
           Lower TTL to 60s before flipping.

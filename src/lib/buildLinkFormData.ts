@@ -16,6 +16,8 @@ export interface BuildFormDataParams {
   desktopRedirectURL: RedirectURL | null;
   showPreviewIOS: boolean | null;
   showPreviewAndroid: boolean | null;
+  copyToClipboardIOS: boolean | null;
+  copyToClipboardAndroid: boolean | null;
   keyValuePair: { key: string; value: string }[];
   utmCampaign: string;
   utmMedium: string;
@@ -64,6 +66,24 @@ export function buildLinkFormData(params: BuildFormDataParams): FormData {
     formData.append("show_preview_ios", String(params.showPreviewIOS));
   if (params.showPreviewAndroid != null)
     formData.append("show_preview_android", String(params.showPreviewAndroid));
+  // The copy flag only applies with the preview page on; an explicit preview-off
+  // link sends false so the inherited project default can't turn it back on.
+  if (params.copyToClipboardIOS != null)
+    formData.append(
+      "copy_to_clipboard_ios",
+      String(
+        params.showPreviewIOS === false ? false : params.copyToClipboardIOS
+      )
+    );
+  if (params.copyToClipboardAndroid != null)
+    formData.append(
+      "copy_to_clipboard_android",
+      String(
+        params.showPreviewAndroid === false
+          ? false
+          : params.copyToClipboardAndroid
+      )
+    );
   if (params.desktopRedirectURL)
     formData.append(
       "desktop_custom_redirect",

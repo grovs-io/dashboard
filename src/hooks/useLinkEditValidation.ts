@@ -1,4 +1,4 @@
-import { FILE, DEFAULT } from "@/constants/OptionsConstants";
+import { FILE, DEFAULT, QUICK_LINK } from "@/constants/OptionsConstants";
 import { deepEqual } from "@/lib/utils";
 import { hasText, isValidHttpsUrl } from "@/lib/validation";
 import isURL from "validator/lib/isURL";
@@ -22,6 +22,8 @@ export interface LinkEditFormValues {
   desktopRedirectType: string;
   showPreviewIOS: boolean | null;
   showPreviewAndroid: boolean | null;
+  copyToClipboardIOS: boolean | null;
+  copyToClipboardAndroid: boolean | null;
   utmCampaign: string;
   utmMedium: string;
   utmSource: string;
@@ -33,6 +35,23 @@ function getRedirectUrl(obj: RedirectURL | null | undefined): string | null {
   return obj && hasText(obj.url) ? obj.url : null;
 }
 
+// null means "inherit the project default", which is a different state from an
+// explicit false — comparing truthiness would hide a switch from one to the other.
+function tristateEqual(
+  a: boolean | null | undefined,
+  b: boolean | null | undefined
+): boolean {
+  return (a ?? null) === (b ?? null);
+}
+
+// The form stores "no redirect" as null, the API may send null or omit the key.
+function redirectsEqual(
+  a: RedirectURL | null | undefined,
+  b: RedirectURL | null | undefined
+): boolean {
+  return deepEqual(a ?? null, b ?? null);
+}
+
 export function hasEditChanges(
   form: LinkEditFormValues,
   selectedLink: Link,
@@ -41,28 +60,41 @@ export function hasEditChanges(
   const isFileType = form.imageType === FILE;
   const socialMediaImageChanged = isFileType
     ? !!form.imageFile
-    : hasText(form.imageLink)
-      ? form.imageLink !== (selectedLink.image ?? "")
-      : false;
+    : (form.imageLink ?? "") !== (selectedLink.image ?? "");
 
   return (
     (selectedLink.name ?? "") !== (form.name ?? "") ||
-    (selectedLink.ads_platform ?? "") !== (form.linkType ?? "") ||
+    (selectedLink.ads_platform ?? QUICK_LINK) !==
+      (form.linkType ?? QUICK_LINK) ||
     (selectedLink.path ?? "") !== (form.path ?? "") ||
-    (hasText(form.socialMediaTitle) &&
-      (selectedLink.title ?? "") !== form.socialMediaTitle) ||
-    (hasText(form.socialMediaSubTitle) &&
-      (selectedLink.subtitle ?? "") !== form.socialMediaSubTitle) ||
+    (selectedLink.title ?? "") !== (form.socialMediaTitle ?? "") ||
+    (selectedLink.subtitle ?? "") !== (form.socialMediaSubTitle ?? "") ||
     socialMediaImageChanged ||
-    !deepEqual(form.androidRedirectURL, selectedLink.android_custom_redirect) ||
-    !deepEqual(form.iOSRedirectURL, selectedLink.ios_custom_redirect) ||
-    !deepEqual(form.desktopRedirectURL, selectedLink.desktop_custom_redirect) ||
+    !redirectsEqual(
+      form.androidRedirectURL,
+      selectedLink.android_custom_redirect
+    ) ||
+    !redirectsEqual(form.iOSRedirectURL, selectedLink.ios_custom_redirect) ||
+    !redirectsEqual(
+      form.desktopRedirectURL,
+      selectedLink.desktop_custom_redirect
+    ) ||
     (form.utmCampaign ?? "") !== (selectedLink.tracking_campaign ?? "") ||
     (form.utmMedium ?? "") !== (selectedLink.tracking_medium ?? "") ||
     (form.utmSource ?? "") !== (selectedLink.tracking_source ?? "") ||
-    (selectedLink.show_preview_ios ?? false) !== !!form.showPreviewIOS ||
-    (selectedLink.show_preview_android ?? false) !==
-      !!form.showPreviewAndroid ||
+    !tristateEqual(selectedLink.show_preview_ios, form.showPreviewIOS) ||
+    !tristateEqual(
+      selectedLink.show_preview_android,
+      form.showPreviewAndroid
+    ) ||
+    !tristateEqual(
+      selectedLink.copy_to_clipboard_ios,
+      form.copyToClipboardIOS
+    ) ||
+    !tristateEqual(
+      selectedLink.copy_to_clipboard_android,
+      form.copyToClipboardAndroid
+    ) ||
     !deepEqual(selectedLink.tags ?? [], form.tagList ?? []) ||
     !deepEqual(initialKeyPair ?? {}, form.keyValuePair ?? {})
   );

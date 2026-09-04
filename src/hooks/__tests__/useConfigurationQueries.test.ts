@@ -7,6 +7,9 @@ import {
   useRedirectConfigQuery,
   useDomainConfigQuery,
   useCustomDomainQuery,
+  useCustomDomainEnvelopeQuery,
+  useCustomDomainsQuery,
+  useCustomDomainsEnvelopeQuery,
   customDomainRefetchInterval,
 } from "../queries/useConfigurationQueries";
 
@@ -18,18 +21,22 @@ vi.mock("@/api/configurations/domains/configDomainsService", () => ({
   getProjectDomainAPICall: vi.fn(),
   getDomainDefaultsAPICall: vi.fn(),
   getCustomDomainAPICall: vi.fn(),
+  getCustomDomainsAPICall: vi.fn(),
+  getCustomDomainPreflightAPICall: vi.fn(),
 }));
 
 import { getProjectRedirectsAPICall } from "@/api/configurations/redirect/configRedirectService";
 import {
   getProjectDomainAPICall,
   getCustomDomainAPICall,
+  getCustomDomainsAPICall,
 } from "@/api/configurations/domains/configDomainsService";
 import { ApiError } from "@/lib/ApiError";
 
 const mockedGetRedirects = vi.mocked(getProjectRedirectsAPICall);
 const mockedGetDomain = vi.mocked(getProjectDomainAPICall);
 const mockedGetCustomDomain = vi.mocked(getCustomDomainAPICall);
+const mockedGetCustomDomains = vi.mocked(getCustomDomainsAPICall);
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -186,6 +193,89 @@ describe("useConfigurationQueries", () => {
 
       await waitFor(() => expect(result.current.isError).toBe(true));
       expect(mockedGetCustomDomain).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("useCustomDomainEnvelopeQuery", () => {
+    it("returns the full singular envelope", async () => {
+      const envelope = {
+        custom_domain: null,
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      };
+      mockedGetCustomDomain.mockResolvedValueOnce({ data: envelope } as never);
+
+      const { result } = renderHook(
+        () => useCustomDomainEnvelopeQuery("proj-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(envelope);
+    });
+
+    it("shares the request with the row-shaped hook (same query key)", async () => {
+      const envelope = {
+        custom_domain: {
+          hostname: "links.acme.com",
+          status: "pending",
+          cname_target: "links.app.com",
+        },
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      };
+      mockedGetCustomDomain.mockResolvedValue({ data: envelope } as never);
+
+      const wrapper = createWrapper(queryClient);
+      const envelopeHook = renderHook(
+        () => useCustomDomainEnvelopeQuery("proj-1"),
+        { wrapper }
+      );
+      const rowHook = renderHook(() => useCustomDomainQuery("proj-1"), {
+        wrapper,
+      });
+
+      await waitFor(() =>
+        expect(envelopeHook.result.current.isSuccess).toBe(true)
+      );
+      await waitFor(() => expect(rowHook.result.current.isSuccess).toBe(true));
+      expect(rowHook.result.current.data).toEqual(envelope.custom_domain);
+      expect(mockedGetCustomDomain).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("useCustomDomainsEnvelopeQuery", () => {
+    it("returns the full list envelope, and the row hook the bare rows", async () => {
+      const envelope = {
+        custom_domains: [
+          {
+            hostname: "links.acme.com",
+            purpose: "primary",
+            status: "pending",
+            cname_target: "links.app.com",
+          },
+        ],
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      };
+      mockedGetCustomDomains.mockResolvedValue({ data: envelope } as never);
+
+      const wrapper = createWrapper(queryClient);
+      const envelopeHook = renderHook(
+        () => useCustomDomainsEnvelopeQuery("proj-1"),
+        { wrapper }
+      );
+      const rowsHook = renderHook(() => useCustomDomainsQuery("proj-1"), {
+        wrapper,
+      });
+
+      await waitFor(() =>
+        expect(envelopeHook.result.current.isSuccess).toBe(true)
+      );
+      await waitFor(() => expect(rowsHook.result.current.isSuccess).toBe(true));
+      expect(envelopeHook.result.current.data).toEqual(envelope);
+      expect(rowsHook.result.current.data).toEqual(envelope.custom_domains);
+      expect(mockedGetCustomDomains).toHaveBeenCalledTimes(1);
     });
   });
 });

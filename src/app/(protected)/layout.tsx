@@ -6,7 +6,7 @@ import ProtectedRoute from "@/lib/ProtectedRoute";
 import ClientLayout from "./ClientLayout";
 import { ProjectSelectionProvider } from "@/context/useProjectSelection";
 import React, { Suspense } from "react";
-import PageSkeleton from "@/components/common/PageSkeleton";
+import { ContentSkeleton } from "@/components/common/PageSkeleton";
 
 import CreateCampaignGlobalDialogProvider from "@/context/useCreateCampaignDialogContext";
 import LinkDialogProvider from "@/context/useLinkDialogContext";
@@ -34,7 +34,7 @@ export default function DashboardLayout({
                   <AppSidebar />
                   <SidebarInset>
                     <main id="main-content">
-                      <Suspense fallback={<PageSkeleton />}>
+                      <Suspense fallback={<ContentSkeleton />}>
                         {children}
                       </Suspense>
                     </main>

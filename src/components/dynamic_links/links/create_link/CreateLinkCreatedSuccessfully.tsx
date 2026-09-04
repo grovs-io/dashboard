@@ -110,7 +110,7 @@ const CreateLinkCreatedSuccessfully = ({
   };
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full animate-in fade-in-0 zoom-in-95 duration-300">
       {/* Success hero with gradient */}
       <div
         className="relative px-6 pt-10 pb-6 flex flex-col items-center text-center"
@@ -129,19 +129,23 @@ const CreateLinkCreatedSuccessfully = ({
           <X className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center justify-center h-12 w-12 rounded-2xl bg-valid-green/10 mb-4">
-          <CircleCheck className="h-6 w-6 text-valid-green" />
+        {/* Animated success badge with expanding ring */}
+        <div className="relative mb-4 flex items-center justify-center">
+          <span className="absolute h-12 w-12 rounded-2xl border-2 border-valid-green animate-success-ring" />
+          <div className="flex items-center justify-center h-12 w-12 rounded-2xl bg-valid-green/10 animate-success-pop">
+            <CircleCheck className="h-6 w-6 text-valid-green" />
+          </div>
         </div>
 
-        <h2 className="text-xl font-semibold tracking-tight mb-1">
+        <h2 className="text-xl font-semibold tracking-tight mb-1 animate-fade-up-1">
           {createdLink?.name}
         </h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-sm text-muted-foreground leading-relaxed animate-fade-up-2">
           Your {platform.successLabel} has been created and is ready to use.
         </p>
 
         {/* Link URL */}
-        <div className="flex items-center w-full rounded-md border border-sidebar-border bg-background/60 dark:bg-background/40 backdrop-blur-sm px-4 py-3 gap-3 mt-5">
+        <div className="flex items-center w-full rounded-md border border-sidebar-border bg-background/60 dark:bg-background/40 backdrop-blur-sm px-4 py-3 gap-3 mt-5 animate-fade-up-3">
           <p className="flex-1 min-w-0 text-sm select-all truncate">
             <span className="text-muted-foreground">
               {createdLink?.access_path?.split("/").slice(0, 3).join("/")}/

@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ArrowRight,
   Shield,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { config } from "@/lib/config";
@@ -37,6 +38,11 @@ const ScaleUpDialog = ({
       icon: BarChart3,
       title: "Advanced Analytics",
       desc: "Full tracking & CSV exports",
+    },
+    {
+      icon: CalendarClock,
+      title: "2 Years Retention",
+      desc: "Query up to 2 years of analytics",
     },
     {
       icon: DollarSign,

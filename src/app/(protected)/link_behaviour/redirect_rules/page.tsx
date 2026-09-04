@@ -37,12 +37,14 @@ const defaultFormValues: RedirectRulesFormValues = {
     appStore: false,
     customUrl: "",
     showPreview: false,
+    copyToClipboard: false,
   },
   ios: {
     enabled: false,
     appStore: true,
     customUrl: "",
     showPreview: false,
+    copyToClipboard: false,
   },
   desktop: {
     generatedPage: true,
@@ -56,6 +58,8 @@ function buildFormValuesFromServer(
         default_fallback: string;
         show_preview_android: boolean;
         show_preview_ios: boolean;
+        copy_to_clipboard_android?: boolean;
+        copy_to_clipboard_ios?: boolean;
         android?: RedirectPlatformConfig;
         ios?: RedirectPlatformConfig;
         desktop?: RedirectPlatformConfig;
@@ -75,12 +79,16 @@ function buildFormValuesFromServer(
       appStore: !!androidPhone?.appstore,
       customUrl: androidPhone?.fallback_url || "",
       showPreview: !!config.show_preview_android,
+      copyToClipboard:
+        !!config.show_preview_android && !!config.copy_to_clipboard_android,
     },
     ios: {
       enabled: !!iosPhone?.enabled,
       appStore: iosPhone?.appstore != null ? !!iosPhone.appstore : true,
       customUrl: iosPhone?.fallback_url || "",
       showPreview: !!config.show_preview_ios,
+      copyToClipboard:
+        !!config.show_preview_ios && !!config.copy_to_clipboard_ios,
     },
     desktop: {
       generatedPage:
@@ -118,10 +126,12 @@ const RedirectRulesPage = () => {
   const androidStore = watch("android.appStore");
   const androidCustomUrl = watch("android.customUrl");
   const androidShowPreview = watch("android.showPreview");
+  const androidCopyToClipboard = watch("android.copyToClipboard");
   const iosEnabled = watch("ios.enabled");
   const iosStore = watch("ios.appStore");
   const iosCustomUrl = watch("ios.customUrl");
   const iosShowPreview = watch("ios.showPreview");
+  const iosCopyToClipboard = watch("ios.copyToClipboard");
   const desktopGeneratedPage = watch("desktop.generatedPage");
   const desktopCustomUrl = watch("desktop.customUrl");
 
@@ -145,6 +155,10 @@ const RedirectRulesPage = () => {
   const [showErrorsIos, setShowErrorsIos] = useState<boolean>(false);
   const [showErrorsDesktop, setShowErrorsDesktop] = useState<boolean>(false);
   const [flowPanelOpen, setFlowPanelOpen] = useState<boolean>(true);
+  // Which project the form currently holds server values for. Change detection
+  // stays off until it matches, so a load (or a project switch) can't report the
+  // still-default form as edited.
+  const [seededProjectId, setSeededProjectId] = useState<string | null>(null);
 
   const fallbackRef = useRef<HTMLDivElement>(null);
   const androidRef = useRef<HTMLDivElement>(null);
@@ -152,6 +166,8 @@ const RedirectRulesPage = () => {
   const desktopRef = useRef<HTMLDivElement>(null);
 
   // --- Change detection ---
+
+  const formSeeded = !!projectId && seededProjectId === projectId;
 
   const fallbackChanges = useMemo(() => {
     if (!projectRedirectsConfig) return false;
@@ -164,7 +180,17 @@ const RedirectRulesPage = () => {
     return defaultUrl !== "";
   }, [defaultUrl, projectRedirectsConfig]);
 
+  // The copy toggle only takes effect with the preview page on, so compare
+  // against the same ANDed value the form was seeded with.
+  const serverCopyAndroid =
+    !!projectRedirectsConfig?.show_preview_android &&
+    !!projectRedirectsConfig?.copy_to_clipboard_android;
+  const serverCopyIos =
+    !!projectRedirectsConfig?.show_preview_ios &&
+    !!projectRedirectsConfig?.copy_to_clipboard_ios;
+
   const isBehaviourChangedAndroid = () => {
+    if (androidCopyToClipboard !== serverCopyAndroid) return true;
     if (
       androidShowPreview === false &&
       !projectRedirectsConfig?.show_preview_android
@@ -175,14 +201,19 @@ const RedirectRulesPage = () => {
   };
 
   const isBehaviourChangedIOS = () => {
+    if (iosCopyToClipboard !== serverCopyIos) return true;
     if (iosShowPreview === false && !projectRedirectsConfig?.show_preview_ios) {
       return false;
     }
     return iosShowPreview !== projectRedirectsConfig?.show_preview_ios;
   };
 
-  const androidChanges = useMemo(() => {
-    if (!androidRedirectConfig) return false;
+  // Redirect edits (enabled/store/URL) and behaviour edits (preview/clipboard)
+  // are tracked apart: behaviour lives on the project config, so it is editable
+  // even for a platform that has no redirect entry yet, and a behaviour-only
+  // edit must not be validated against a URL field the user never touched.
+  const androidRedirectChanged = useMemo(() => {
+    if (!formSeeded) return false;
     let haveChanged = false;
     if (androidRedirectConfig?.phone) {
       if (androidRedirectConfig?.phone?.fallback_url) {
@@ -209,23 +240,20 @@ const RedirectRulesPage = () => {
         haveChanged = true;
       }
     }
-    const behaviourChanged =
-      androidShowPreview === false &&
-      !projectRedirectsConfig?.show_preview_android
-        ? false
-        : androidShowPreview !== projectRedirectsConfig?.show_preview_android;
-    return haveChanged || behaviourChanged;
+    return haveChanged;
   }, [
+    formSeeded,
     androidEnabled,
     androidStore,
     androidCustomUrl,
-    androidShowPreview,
     androidRedirectConfig,
-    projectRedirectsConfig,
   ]);
 
-  const iosChanges = useMemo(() => {
-    if (!iOSRedirectConfig) return false;
+  const androidChanges =
+    formSeeded && (androidRedirectChanged || isBehaviourChangedAndroid());
+
+  const iosRedirectChanged = useMemo(() => {
+    if (!formSeeded) return false;
     let haveChanged = false;
     if (iOSRedirectConfig?.phone) {
       if (iOSRedirectConfig?.phone?.fallback_url) {
@@ -248,24 +276,16 @@ const RedirectRulesPage = () => {
         haveChanged = true;
       }
     }
-    const behaviourChanged =
-      iosShowPreview === false && !projectRedirectsConfig?.show_preview_ios
-        ? false
-        : iosShowPreview !== projectRedirectsConfig?.show_preview_ios;
-    return haveChanged || behaviourChanged;
-  }, [
-    iosEnabled,
-    iosStore,
-    iosCustomUrl,
-    iosShowPreview,
-    iOSRedirectConfig,
-    projectRedirectsConfig,
-  ]);
+    return haveChanged;
+  }, [formSeeded, iosEnabled, iosStore, iosCustomUrl, iOSRedirectConfig]);
+
+  const iosChanges =
+    formSeeded && (iosRedirectChanged || isBehaviourChangedIOS());
 
   const desktopChanges = useMemo(() => {
-    if (!desktopRedirectConfig) return false;
+    if (!formSeeded) return false;
     let haveChanged = false;
-    if (desktopRedirectConfig.all) {
+    if (desktopRedirectConfig?.all) {
       if (desktopGeneratedPage) {
         if (desktopGeneratedPage !== desktopRedirectConfig?.all?.appstore) {
           haveChanged = true;
@@ -281,7 +301,12 @@ const RedirectRulesPage = () => {
       }
     }
     return haveChanged;
-  }, [desktopGeneratedPage, desktopCustomUrl, desktopRedirectConfig]);
+  }, [
+    formSeeded,
+    desktopGeneratedPage,
+    desktopCustomUrl,
+    desktopRedirectConfig,
+  ]);
 
   const hasAnyChanges =
     fallbackChanges || androidChanges || iosChanges || desktopChanges;
@@ -383,6 +408,8 @@ const RedirectRulesPage = () => {
         defaultFallback: normalizedUrl,
         showAndroidPreview: androidShowPreview,
         showIosPreview: iosShowPreview,
+        copyToClipboardAndroid: androidShowPreview && androidCopyToClipboard,
+        copyToClipboardIos: iosShowPreview && iosCopyToClipboard,
       });
       setValue("defaultUrl", normalizedUrl, { shouldDirty: false });
       return response.data.redirect_config;
@@ -438,26 +465,26 @@ const RedirectRulesPage = () => {
 
   const handleSaveAll = async () => {
     if (fallbackChanges) setShowErrorsFallback(true);
-    if (androidChanges) setShowErrorsAndroid(true);
-    if (iosChanges) setShowErrorsIos(true);
+    if (androidRedirectChanged) setShowErrorsAndroid(true);
+    if (iosRedirectChanged) setShowErrorsIos(true);
     if (desktopChanges) setShowErrorsDesktop(true);
 
     // Check which platforms need SDK but don't have it
     const androidSdkMissing =
-      androidChanges &&
+      androidRedirectChanged &&
       androidEnabled &&
       !androidConfig?.configuration?.identifier;
     const iosSdkMissing =
-      iosChanges && iosEnabled && !iosConfig?.configuration?.bundle_id;
+      iosRedirectChanged && iosEnabled && !iosConfig?.configuration?.bundle_id;
 
     // Block save if any changed platform has an empty visible URL field
     const androidUrlRequired =
-      androidChanges &&
+      androidRedirectChanged &&
       !androidSdkMissing &&
       ((!androidEnabled && androidCustomUrl === "") ||
         (androidEnabled && !androidStore && androidCustomUrl === ""));
     const iosUrlRequired =
-      iosChanges &&
+      iosRedirectChanged &&
       !iosSdkMissing &&
       ((!iosEnabled && iosCustomUrl === "") ||
         (iosEnabled && !iosStore && iosCustomUrl === ""));
@@ -486,15 +513,15 @@ const RedirectRulesPage = () => {
     // Validate non-SDK-blocked platforms
     if (
       !defaultUrlValid ||
-      (androidChanges && !androidSdkMissing && !androidValid) ||
-      (iosChanges && !iosSdkMissing && !iosValid) ||
+      (androidRedirectChanged && !androidSdkMissing && !androidValid) ||
+      (iosRedirectChanged && !iosSdkMissing && !iosValid) ||
       (desktopChanges && !desktopValid)
     ) {
       const ref = !defaultUrlValid
         ? fallbackRef
-        : androidChanges && !androidSdkMissing && !androidValid
+        : androidRedirectChanged && !androidSdkMissing && !androidValid
           ? androidRef
-          : iosChanges && !iosSdkMissing && !iosValid
+          : iosRedirectChanged && !iosSdkMissing && !iosValid
             ? iosRef
             : desktopRef;
       setTimeout(
@@ -505,11 +532,18 @@ const RedirectRulesPage = () => {
       return;
     }
 
-    // Check if there are any saveable changes
-    const hasAndroidSaveable = androidChanges && !androidSdkMissing;
-    const hasIosSaveable = iosChanges && !iosSdkMissing;
+    // The preview/clipboard flags live on the project-level redirect config, so
+    // they save through one PUT that no platform's SDK or URL state can block.
+    const behaviourChanged =
+      isBehaviourChangedAndroid() || isBehaviourChangedIOS();
+    const hasAndroidSaveable = androidRedirectChanged && !androidSdkMissing;
+    const hasIosSaveable = iosRedirectChanged && !iosSdkMissing;
     const hasSaveableChanges =
-      fallbackChanges || hasAndroidSaveable || hasIosSaveable || desktopChanges;
+      fallbackChanges ||
+      behaviourChanged ||
+      hasAndroidSaveable ||
+      hasIosSaveable ||
+      desktopChanges;
 
     // If all changes are SDK-blocked, show warning and return
     if (!hasSaveableChanges && (androidSdkMissing || iosSdkMissing)) {
@@ -531,26 +565,18 @@ const RedirectRulesPage = () => {
     isSavingRef.current = true;
 
     try {
-      // Save default fallback first if needed
-      if (fallbackChanges) {
+      // Default fallback + both platforms' preview/clipboard flags: one PUT.
+      if ((fallbackChanges || behaviourChanged) && defaultUrlValid) {
         await handleSetDefaultRedirect();
       }
 
       // Save Android (skip if SDK missing)
       if (hasAndroidSaveable && androidValid) {
-        const androidBehaviourChanges = isBehaviourChangedAndroid();
-        if (androidBehaviourChanges && defaultUrlValid) {
-          await handleSetDefaultRedirect();
-        }
         await handleSaveAndroid();
       }
 
       // Save iOS (skip if SDK missing)
       if (hasIosSaveable && iosValid) {
-        const iosBehaviourChanges = isBehaviourChangedIOS();
-        if (iosBehaviourChanges && defaultUrlValid) {
-          await handleSetDefaultRedirect();
-        }
         await handleSaveIos();
       }
 
@@ -636,7 +662,8 @@ const RedirectRulesPage = () => {
 
     const serverValues = buildFormValuesFromServer(projectRedirectsConfig);
     reset(serverValues);
-  }, [projectRedirectsConfig, reset]);
+    setSeededProjectId(projectId ?? null);
+  }, [projectRedirectsConfig, projectId, reset]);
 
   return (
     <FormProvider {...form}>
@@ -710,14 +737,14 @@ const RedirectRulesPage = () => {
                 )}
               </div>
 
-              <div className="flex flex-col gap-0 px-6 pt-4 pb-16 max-w-[900px]">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="flex flex-col gap-0.5 flex-1">
-                    <h2 className="text-sm font-semibold">Redirect Rules</h2>
-                    <p className="text-xs text-muted-foreground">
-                      Configure how links behave across different platforms.
-                    </p>
-                  </div>
+              <div className="flex flex-col gap-0 px-6 pt-6 pb-16 max-w-[900px]">
+                <div className="mb-7">
+                  <h2 className="text-[18px] font-semibold tracking-tight">
+                    Redirect Rules
+                  </h2>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    Configure how links behave across different platforms.
+                  </p>
                 </div>
 
                 <div ref={fallbackRef}>
@@ -763,10 +790,12 @@ const RedirectRulesPage = () => {
               androidStore={androidStore}
               androidCustomUrl={androidCustomUrl}
               androidShowPreview={androidShowPreview}
+              androidCopyToClipboard={androidCopyToClipboard}
               iosApp={iosEnabled}
               iosStore={iosStore}
               iosCustomUrl={iosCustomUrl}
               iosShowPreview={iosShowPreview}
+              iosCopyToClipboard={iosCopyToClipboard}
               desktopGeneratedPage={desktopGeneratedPage}
               desktopCustomUrl={desktopCustomUrl}
               defaultUrl={defaultUrl}

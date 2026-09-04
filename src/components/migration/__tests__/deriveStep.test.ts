@@ -17,6 +17,8 @@ const baseSource: MigrationSource = {
   id: 1,
   provider: "branch",
   old_host: "old.acme.com",
+  provider_hosted: false,
+  extra_hosts: [],
   enabled: true,
   health: "healthy",
   consecutive_failures: 0,
@@ -160,6 +162,45 @@ describe("deriveStep", () => {
         attestations: { cutoverDone: true },
       })
     ).toBe("dns_verify");
+  });
+
+  it("managed for a provider-hosted source with no domain row", () => {
+    expect(
+      deriveStep({
+        domainsLoading: false,
+        sourceLoading: false,
+        domains: [],
+        source: { ...baseSource, provider_hosted: true },
+        sourceErrorStatus: undefined,
+        attestations: {},
+      })
+    ).toBe("managed");
+  });
+
+  it("provider-hosted ignores unrelated domain rows in any state", () => {
+    expect(
+      deriveStep({
+        domainsLoading: false,
+        sourceLoading: false,
+        domains: [baseDomain({ purpose: "primary", status: "failed" })],
+        source: { ...baseSource, provider_hosted: true },
+        sourceErrorStatus: undefined,
+        attestations: {},
+      })
+    ).toBe("managed");
+  });
+
+  it("still loading while queries pend even for provider-hosted", () => {
+    expect(
+      deriveStep({
+        domainsLoading: true,
+        sourceLoading: false,
+        domains: undefined,
+        source: { ...baseSource, provider_hosted: true },
+        sourceErrorStatus: undefined,
+        attestations: {},
+      })
+    ).toBe("loading");
   });
 
   it("only considers the migration-purpose row", () => {

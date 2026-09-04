@@ -48,6 +48,8 @@ test.describe("stale pending bubble repro", () => {
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
+            tls_mode: "cloudflare",
+            ingress_host: null,
             custom_domains: [
               state.status === "pending" ? pendingRow : activeRow,
             ],
@@ -63,6 +65,8 @@ test.describe("stale pending bubble repro", () => {
           contentType: "application/json",
           body: JSON.stringify({
             custom_domain: state.status === "pending" ? pendingRow : activeRow,
+            tls_mode: "cloudflare",
+            ingress_host: null,
           }),
         });
       }

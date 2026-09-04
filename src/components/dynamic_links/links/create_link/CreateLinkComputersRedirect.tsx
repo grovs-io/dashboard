@@ -168,9 +168,20 @@ const CreateLinkComputersRedirect = React.memo(
         <OptionDropdown
           options={REDIRECT_OPTIONS}
           value={desktopRedirectType}
-          onChange={(value) =>
-            !disabledActions && setDesktopRedirectType(value)
-          }
+          onChange={(value) => {
+            if (disabledActions) return;
+
+            setDesktopRedirectType(value);
+            if (value === DEFAULT) {
+              setDesktopRedirectURL(null);
+              return;
+            }
+
+            setDesktopRedirectURL((previous) => ({
+              url: previous?.url ?? "",
+              open_app_if_installed: false,
+            }));
+          }}
           disabled={disabledActions}
         />
 

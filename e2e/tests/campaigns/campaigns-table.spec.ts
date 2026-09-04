@@ -15,15 +15,15 @@ test.describe("Campaigns Table", () => {
   }) => {
     await page.goto("/dynamic_links/campaigns");
 
-    const createButton = page.getByRole("button", {
-      name: /create.*campaign|new.*campaign/i,
-    });
+    const createButton = page
+      .getByRole("button", { name: /create.*campaign|new.*campaign/i })
+      .first();
     await expect(createButton).toBeVisible({ timeout: 10_000 });
     await createButton.click();
 
     // Dialog should appear with name input
     await expect(
-      page.getByPlaceholder(/name/i).or(page.getByLabel(/name/i))
+      page.getByRole("dialog").getByText(/campaign name/i)
     ).toBeVisible({ timeout: 5000 });
   });
 });

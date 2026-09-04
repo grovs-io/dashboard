@@ -5,6 +5,14 @@ import type {
   GetRevenueParams,
   GetMessagingParams,
   GetVisitorsParams,
+  AnalyticsEventsParams,
+  AnalyticsEventVolumeParams,
+  AnalyticsFieldValuesParams,
+  AnalyticsOverviewParams,
+  AnalyticsDateRangeParams,
+  OverviewKeyMetricSeriesParams,
+  AnalyticsRetentionSummaryParams,
+  AuditEventFilters,
 } from "@/types";
 import type {
   EventsSearchPayload,
@@ -111,6 +119,123 @@ export const queryKeys = {
       ] as const,
     migrationSource: (projectId: string) =>
       [...queryKeys.projects.detail(projectId), "migrationSource"] as const,
+
+    // Analytics - Events
+    analyticsEvents: (projectId: string, params?: AnalyticsEventsParams) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsEvents",
+        params,
+      ] as const,
+    analyticsEventDetail: (projectId: string, eventId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsEventDetail",
+        eventId,
+      ] as const,
+    analyticsEventVolume: (
+      projectId: string,
+      params?: AnalyticsEventVolumeParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsEventVolume",
+        params,
+      ] as const,
+    analyticsEventFieldValues: (
+      projectId: string,
+      params?: AnalyticsFieldValuesParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsEventFieldValues",
+        params,
+      ] as const,
+    analyticsEventFields: (projectId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsEventFields",
+      ] as const,
+
+    // Analytics - Overview
+    analyticsOverviewVersions: (
+      projectId: string,
+      params?: AnalyticsOverviewParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewVersions",
+        params,
+      ] as const,
+    analyticsOverviewVersionDistribution: (
+      projectId: string,
+      params?: AnalyticsOverviewParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewVersionDistribution",
+        params,
+      ] as const,
+    analyticsOverviewVersionFunnel: (
+      projectId: string,
+      version: string,
+      params?: AnalyticsOverviewParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewVersionFunnel",
+        version,
+        params,
+      ] as const,
+    analyticsOverviewUserTrends: (
+      projectId: string,
+      params?: AnalyticsOverviewParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewUserTrends",
+        params,
+      ] as const,
+    analyticsOverviewSourcesBreakdown: (
+      projectId: string,
+      params?: AnalyticsOverviewParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewSourcesBreakdown",
+        params,
+      ] as const,
+
+    analyticsOverviewKeyMetrics: (
+      projectId: string,
+      params?: AnalyticsDateRangeParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewKeyMetrics",
+        params,
+      ] as const,
+
+    analyticsOverviewKeyMetricSeries: (
+      projectId: string,
+      params?: OverviewKeyMetricSeriesParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsOverviewKeyMetricSeries",
+        params,
+      ] as const,
+
+    // Analytics - Retention
+    analyticsRetentionSummary: (
+      projectId: string,
+      params?: AnalyticsRetentionSummaryParams
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsRetentionSummary",
+        params,
+      ] as const,
   },
 
   instances: {
@@ -129,6 +254,20 @@ export const queryKeys = {
         "setupProgress",
         category,
       ] as const,
+    auditHead: (instanceId: string) =>
+      [...queryKeys.instances.detail(instanceId), "auditHead"] as const,
+    auditEventsAll: (instanceId: string) =>
+      [...queryKeys.instances.detail(instanceId), "auditEvents"] as const,
+    auditEvents: (instanceId: string, filters?: AuditEventFilters) =>
+      [
+        ...queryKeys.instances.detail(instanceId),
+        "auditEvents",
+        filters,
+      ] as const,
+    auditExportTokens: (instanceId: string) =>
+      [...queryKeys.instances.detail(instanceId), "auditExportTokens"] as const,
+    ssoConnection: (instanceId: string) =>
+      [...queryKeys.instances.detail(instanceId), "ssoConnection"] as const,
   },
 
   payments: {

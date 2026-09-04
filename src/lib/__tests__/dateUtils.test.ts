@@ -8,6 +8,7 @@ import {
   formatSlashDate,
   formatDayMonthYear,
   formatTime,
+  parseCalendarDate,
 } from "../dateUtils";
 
 describe("formatApiDate", () => {
@@ -68,5 +69,21 @@ describe("formatTime", () => {
   it('formats as "HH:mm:ss"', () => {
     const result = formatTime(new Date(2026, 2, 17, 9, 5, 3));
     expect(result).toBe("09:05:03");
+  });
+});
+
+describe("parseCalendarDate", () => {
+  it("names the same day it was given, in any timezone", () => {
+    const d = parseCalendarDate("2026-03-17");
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(2);
+    expect(d.getDate()).toBe(17);
+  });
+
+  it("renders that day, unlike new Date() at negative offsets", () => {
+    const opts = { month: "short", day: "numeric" } as const;
+    expect(
+      parseCalendarDate("2026-03-17").toLocaleDateString("en-US", opts)
+    ).toBe("Mar 17");
   });
 });

@@ -16,10 +16,11 @@ import { useCreateCampaignMutation } from "@/hooks/mutations/useCampaignsMutatio
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { useEffect, useMemo, useState } from "react";
 
-import { formatApiDate } from "@/lib/dateUtils";
+import { formatApiEndOfDay, formatApiStartOfDay } from "@/lib/dateUtils";
 import { ApiError } from "@/lib/ApiError";
 import { showErrorNotification } from "@/lib/Notifications";
 import { DateRangePicker } from "@/components/dateRangePicker/DateRangePicker";
+import { retentionMinDate } from "@/lib/analyticsLimits";
 import AppHeader from "@/components/layout/app-header";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Plus } from "lucide-react";
@@ -39,6 +40,11 @@ const CampaignsPage = () => {
 
   const { openDialog } = useGlobalDialog();
   const { selectedProject, selectedInstance } = useProjectSelection();
+  // Gated endpoints 422 past the plan window; stop the range being picked at all.
+  const retentionMin = useMemo(
+    () => retentionMinDate(selectedInstance?.analytics_retention, new Date()),
+    [selectedInstance]
+  );
   const createCampaignMutation = useCreateCampaignMutation(
     selectedProject?.id,
     selectedInstance?.id
@@ -67,12 +73,12 @@ const CampaignsPage = () => {
       archived: linksType === ARCHIVED,
       ascending: sort.ascending,
       page,
-      start_date: formatApiDate(dateRange.from),
+      start_date: formatApiStartOfDay(dateRange.from),
       sort_by: sort.sortKey,
       per_page: rowsPerPage,
     };
     if (searchTerm !== "") params.term = searchTerm;
-    if (dateRange.to) params.end_date = formatApiDate(dateRange.to);
+    if (dateRange.to) params.end_date = formatApiEndOfDay(dateRange.to);
     return params;
   }, [
     selectedProject,
@@ -91,7 +97,9 @@ const CampaignsPage = () => {
   const campaigns = campaignsQuery.data?.data;
   const totalPages = campaignsQuery.data?.totalPages ?? 0;
   const totalRows = campaignsQuery.data?.totalEntries ?? 0;
-  const tableLoading = campaignsQuery.isLoading;
+  // Show skeleton rows while the query is disabled (project/date range not yet
+  // ready) or still resolving, so we never flash the empty state on first load.
+  const tableLoading = !campaignsQueryParams || campaignsQuery.isPending;
 
   const campaignsColumnOptions = [
     { label: "Views", value: "views" },
@@ -230,8 +238,6 @@ const CampaignsPage = () => {
                   </PopoverContent>
                 </Popover>
 
-                <DateRangePicker date={dateRange} setDate={setDateRange} />
-
                 <AdsPlatformSelect
                   platformAdsOptions={platformsFilterList}
                   selectedAdsPlatform={platform}
@@ -241,6 +247,11 @@ const CampaignsPage = () => {
               </div>
 
               <div className="flex flex-wrap gap-2 justify-end items-center">
+                <DateRangePicker
+                  date={dateRange}
+                  setDate={setDateRange}
+                  minDate={retentionMin}
+                />
                 <CustomizeColumns
                   columnOptions={campaignsColumnOptions}
                   selectedColumns={selectedColumns}

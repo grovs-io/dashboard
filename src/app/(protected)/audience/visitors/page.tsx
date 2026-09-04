@@ -1,9 +1,14 @@
 "use client";
 
 import { DateRangePicker } from "@/components/dateRangePicker/DateRangePicker";
+import { retentionMinDate } from "@/lib/analyticsLimits";
 import CustomizeColumns from "@/components/common/customize-columns";
 import { Input } from "@/components/ui/input";
-import { formatApiDate, formatShortDate } from "@/lib/dateUtils";
+import {
+  formatApiEndOfDay,
+  formatApiStartOfDay,
+  formatShortDate,
+} from "@/lib/dateUtils";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { useEffect, useMemo, useState } from "react";
 import AdsPlatformSelect from "@/components/common/ads-platform";
@@ -21,13 +26,6 @@ import { useTableParams } from "@/hooks/useTableParams";
 import { IS_ENTERPRISE } from "@/lib/edition";
 
 const VisitorsPage = () => {
-  const defaultDateRange = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    return { from: todayStart, to: now };
-  }, []);
-
   const {
     page,
     setPage,
@@ -41,9 +39,14 @@ const VisitorsPage = () => {
     setDateRange,
     platform,
     setPlatform,
-  } = useTableParams({ defaultDateRange });
+  } = useTableParams();
 
   const { selectedProject, selectedInstance } = useProjectSelection();
+  // Gated endpoints 422 past the plan window; stop the range being picked at all.
+  const retentionMin = useMemo(
+    () => retentionMinDate(selectedInstance?.analytics_retention, new Date()),
+    [selectedInstance]
+  );
 
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] =
     useState<Visitor | null>(null);
@@ -53,12 +56,12 @@ const VisitorsPage = () => {
     const params: GetVisitorsParams = {
       ascending: sort.ascending,
       page,
-      start_date: formatApiDate(dateRange.from),
+      start_date: formatApiStartOfDay(dateRange.from),
       sort_by: sort.sortKey,
       per_page: rowsPerPage,
     };
     if (searchTerm !== "") params.term = searchTerm;
-    if (dateRange.to) params.end_date = formatApiDate(dateRange.to);
+    if (dateRange.to) params.end_date = formatApiEndOfDay(dateRange.to);
     if (platform !== "") params.platform = platform;
     return params;
   }, [
@@ -205,7 +208,11 @@ const VisitorsPage = () => {
                   selectedColumns={selectedColumns}
                   setSelectedColumns={setSelectedColumns}
                 />
-                <DateRangePicker date={dateRange} setDate={setDateRange} />
+                <DateRangePicker
+                  date={dateRange}
+                  setDate={setDateRange}
+                  minDate={retentionMin}
+                />
               </div>
             </div>
 

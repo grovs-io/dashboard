@@ -5,6 +5,7 @@ const platformRedirectSchema = z.object({
   appStore: z.boolean(),
   customUrl: z.string(),
   showPreview: z.boolean(),
+  copyToClipboard: z.boolean(),
 });
 
 export const redirectRulesSchema = z.object({

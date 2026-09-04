@@ -1,31 +1,66 @@
-# Self-hosted dashboard image. NEXT_PUBLIC_* are inlined at build time from build args
-# (Next.js bakes them into the bundle), so they must be passed at `docker build` time.
-FROM node:20-alpine
+# syntax=docker/dockerfile:1
+
+# Product-wide NEXT_PUBLIC_* values are intentionally public and are inlined by
+# Next.js at build time. Deployment-specific API_URL and OAuth credentials are
+# supplied when the container starts.
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY . .
+COPY next-env.d.ts next.config.ts postcss.config.mjs tailwind.config.ts tsconfig.json ./
+COPY public ./public
+COPY src ./src
 
-ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_API_PATH=/api/v1
-ARG NEXT_PUBLIC_CLIENT_ID
 ARG NEXT_PUBLIC_SELF_HOSTED=true
+ARG NEXT_PUBLIC_GROVS_EE=true
 ARG NEXT_PUBLIC_ENV=production
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-    NEXT_PUBLIC_API_PATH=${NEXT_PUBLIC_API_PATH} \
-    NEXT_PUBLIC_CLIENT_ID=${NEXT_PUBLIC_CLIENT_ID} \
-    NEXT_PUBLIC_SELF_HOSTED=${NEXT_PUBLIC_SELF_HOSTED} \
-    NEXT_PUBLIC_ENV=${NEXT_PUBLIC_ENV}
 
+ENV NEXT_PUBLIC_API_PATH=${NEXT_PUBLIC_API_PATH} \
+    NEXT_PUBLIC_SELF_HOSTED=${NEXT_PUBLIC_SELF_HOSTED} \
+    NEXT_PUBLIC_GROVS_EE=${NEXT_PUBLIC_GROVS_EE} \
+    NEXT_PUBLIC_ENV=${NEXT_PUBLIC_ENV} \
+    BUILD_STANDALONE=true \
+    NEXT_TELEMETRY_DISABLED=1
+
+# API_URL and OAuth client credentials are supplied at runtime, not build.
 RUN npm run build
 
-RUN apk add --no-cache curl
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
+FROM node:20-alpine AS runtime
 
-# CLIENT_SECRET (server-side, for the /api/auth/token route) is supplied at runtime.
-CMD ["npm", "run", "start"]
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000
+
+# apk upgrade patches the base image's OS packages (openssl). npm and yarn ship
+# with the node image but the runtime only runs `node server.js`, and their
+# vendored deps (tar, minimatch, glob, sigstore) carry their own CVEs.
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+              /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && apk add --no-cache curl \
+    && addgroup --system --gid 1001 grovs \
+    && adduser --system --uid 1001 --ingroup grovs grovs
+
+WORKDIR /app
+
+COPY --from=builder --chown=grovs:grovs /app/.next/standalone ./
+COPY --from=builder --chown=grovs:grovs /app/.next/static ./.next/static
+COPY --from=builder --chown=grovs:grovs /app/public ./public
+COPY --chown=grovs:grovs docker-entrypoint-selfhosted /usr/local/bin/docker-entrypoint-selfhosted
+RUN chmod +x /usr/local/bin/docker-entrypoint-selfhosted
+
+USER grovs
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD curl -fsS "http://${HOSTNAME}:${PORT}/login" >/dev/null || exit 1
+
+# Required at runtime by the server-side /api/auth token, refresh, and revoke
+# routes. Supply API_URL and OAuth credentials through ECS, never docker build.
+ENTRYPOINT ["docker-entrypoint-selfhosted"]
+CMD ["node", "server.js"]

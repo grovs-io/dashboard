@@ -2,19 +2,28 @@
 "use client";
 
 import ProjectFormDialog from "@/components/sidebar/ProjectFormDialog";
+import InviteLinkDialog, {
+  type InviteLink,
+  inviteLinksFromCreateResponse,
+} from "@/components/settings/InviteLinkDialog";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 import { TEST } from "@/constants/OptionsConstants";
 import { useProjectSelection } from "@/context/useProjectSelection";
-import { useInstancesQuery } from "@/hooks/queries/useInstanceQueries";
+import {
+  useInstancesQuery,
+  useInstanceDetailsQuery,
+} from "@/hooks/queries/useInstanceQueries";
 import { useCreateInstanceMutation } from "@/hooks/mutations/useInstanceMutations";
 import {
   useSubscriptionQuery,
   useMauQuery,
 } from "@/hooks/queries/usePaymentsQueries";
 import { showErrorNotification, showGenericError } from "@/lib/Notifications";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { Instance } from "@/types";
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useUserContext } from "@/context/useUserContext";
+import { writeSearchParams } from "@/lib/searchParamsUrl";
 
 export default function ClientLayout({
   children,
@@ -22,7 +31,6 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const {
     setSelectedProject,
@@ -30,6 +38,7 @@ export default function ClientLayout({
     setSelectedInstance,
     projectType,
     setProjectType,
+    setGetStartedSetup,
   } = useProjectSelection();
 
   const { fetchCurrentUser } = useUserContext();
@@ -37,24 +46,21 @@ export default function ClientLayout({
   // TanStack Query hooks
   const instancesQuery = useInstancesQuery();
   const createInstanceMutation = useCreateInstanceMutation();
+  const [inviteLinks, setInviteLinks] = useState<InviteLink[] | null>(null);
 
   // TanStack Query hooks auto-fetch when selectedInstance changes
   useSubscriptionQuery(selectedInstance?.id);
   useMauQuery(selectedInstance?.id);
+  const instanceDetailsQuery = useInstanceDetailsQuery(selectedInstance?.id);
 
   const firstLoginRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
   const updateSearchParams = useCallback(
     (paramsObj: Record<string, string | (string | number | undefined)>) => {
-      const currentParams = new URLSearchParams(window.location.search);
-      Object.entries(paramsObj).forEach(([key, value]) => {
-        currentParams.set(key, String(value));
-      });
-
-      router.replace(`?${currentParams.toString()}`, { scroll: false });
+      writeSearchParams(paramsObj);
     },
-    [router]
+    []
   );
 
   const initializeFromParams = useCallback(() => {
@@ -115,6 +121,8 @@ export default function ClientLayout({
       });
       const instance = response.data.instance;
       setSelectedInstance(instance);
+      const links = inviteLinksFromCreateResponse(response.data.invite_urls);
+      if (links) setInviteLinks(links);
       try {
         await fetchCurrentUser();
       } catch {
@@ -166,6 +174,13 @@ export default function ClientLayout({
     }
   }, [instancesQuery.isError]);
 
+  // Sync getStartedSetup into context so all pages can read it
+  useEffect(() => {
+    if (instanceDetailsQuery.data?.get_started_setup) {
+      setGetStartedSetup(instanceDetailsQuery.data.get_started_setup);
+    }
+  }, [instanceDetailsQuery.data, setGetStartedSetup]);
+
   useEffect(() => {
     if (!selectedInstance) {
       return;
@@ -189,6 +204,12 @@ export default function ClientLayout({
           variant="first-project"
           open={true}
           handleCreateProject={handleCreateInstance}
+        />
+      )}
+      {IS_SELF_HOSTED && (
+        <InviteLinkDialog
+          links={inviteLinks}
+          onOpenChange={(open) => !open && setInviteLinks(null)}
         />
       )}
       {children}

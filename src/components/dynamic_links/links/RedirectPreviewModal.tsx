@@ -28,6 +28,7 @@ import {
   ImageDown,
   Copy,
   Check,
+  ClipboardCopy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { handleCopyText } from "@/lib/copyTextHelper";
@@ -280,6 +281,13 @@ const PlatformBranch = ({
   );
 };
 
+const CopiesLinkNote = () => (
+  <div className="flex items-center justify-center gap-1 text-muted-foreground">
+    <ClipboardCopy className="h-3 w-3 shrink-0" />
+    <span className="text-[10px]">Copies link</span>
+  </div>
+);
+
 /* ── Redirect to web ──────────────────────────────────────── */
 
 const RedirectWebBranch = ({
@@ -296,6 +304,7 @@ const RedirectWebBranch = ({
             <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="text-[10px]">App preview page</span>
           </div>
+          {redirect.copyToClipboard && <CopiesLinkNote />}
         </TreeNode>
       </>
     )}
@@ -330,6 +339,7 @@ const AppOrFallbackBranch = ({
             <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="text-[10px]">App preview page</span>
           </div>
+          {redirect.copyToClipboard && <CopiesLinkNote />}
         </TreeNode>
       </>
     )}

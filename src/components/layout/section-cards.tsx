@@ -128,7 +128,7 @@ function SortableCard({ id, card }: { id: string; card: DashBoardCardType }) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative rounded-md border border-sidebar-border bg-[#FAFAFA] p-5 transition-colors hover:border-border dark:bg-card",
+        "group relative rounded-md border border-sidebar-border bg-muted/50 p-5 transition-all duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] hover:border-border dark:bg-card dark:shadow-[0_1px_2px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)]",
         isDragging && "opacity-50"
       )}
     >
@@ -147,7 +147,7 @@ function SortableCard({ id, card }: { id: string; card: DashBoardCardType }) {
 
 function StaticCard({ card }: { card: DashBoardCardType }) {
   return (
-    <div className="relative rounded-md border border-sidebar-border bg-[#FAFAFA] p-5 transition-colors hover:border-border dark:bg-card">
+    <div className="relative rounded-md border border-sidebar-border bg-muted/50 p-5 transition-all duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] hover:border-border dark:bg-card dark:shadow-[0_1px_2px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
       <CardContent card={card} />
     </div>
   );
@@ -209,7 +209,7 @@ function SortableCardGrid({
       </SortableContext>
       <DragOverlay>
         {activeCard ? (
-          <div className="rounded-md border border-sidebar-border bg-[#FAFAFA] p-5 shadow-lg scale-[1.02] dark:bg-card">
+          <div className="rounded-md border border-sidebar-border bg-muted/50 p-5 shadow-lg scale-[1.02] dark:bg-card">
             <CardContent card={activeCard} />
           </div>
         ) : null}

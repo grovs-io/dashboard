@@ -1,17 +1,30 @@
 // proxy.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { IS_SELF_HOSTED } from "@/lib/edition";
+import { buildContentSecurityPolicy } from "@/lib/contentSecurityPolicy";
 
 const aliasMap: Record<string, string> = {
   "/new-password": "/new_password",
   "/links": "/dynamic_links/links",
   "/settings/subscription": "/settings",
+  // The Overview is now the dashboard; keep old links/bookmarks working.
+  "/analytics/overview": "/dashboard",
   // add more one-to-one aliases here
 };
 
 export function proxy(request: NextRequest) {
   const url = request.nextUrl;
   const { pathname } = url;
+
+  if (
+    IS_SELF_HOSTED &&
+    (pathname === "/register" || pathname.startsWith("/register/"))
+  ) {
+    const to = new URL(url);
+    to.pathname = "/login";
+    return NextResponse.redirect(to, 307);
+  }
 
   // direct match
   if (aliasMap[pathname]) {
@@ -30,7 +43,28 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  const apiUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+
+  if (apiUrl) {
+    response.headers.set(
+      "Content-Security-Policy",
+      buildContentSecurityPolicy({
+        apiUrl,
+        nodeEnv: process.env.NODE_ENV,
+        posthogUrl: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        posthogEnabled: Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY),
+        gtmEnabled: Boolean(process.env.NEXT_PUBLIC_GTM_ID),
+        chatwootUrl: process.env.NEXT_PUBLIC_CHATWOOT_URL,
+        chatwootEnabled:
+          !IS_SELF_HOSTED &&
+          Boolean(process.env.NEXT_PUBLIC_CHATWOOT_URL) &&
+          Boolean(process.env.NEXT_PUBLIC_CHATWOOT_TOKEN),
+      })
+    );
+  }
+
+  return response;
 }
 
 export const config = {

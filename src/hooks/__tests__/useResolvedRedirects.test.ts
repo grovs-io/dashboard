@@ -15,6 +15,8 @@ const baseLink: LinkRedirectsInput = {
   desktopRedirectType: DEFAULT,
   showPreviewAndroid: null,
   showPreviewIOS: null,
+  copyToClipboardAndroid: null,
+  copyToClipboardIOS: null,
 };
 
 const makeConfig = (overrides?: Partial<RedirectConfig>): RedirectConfig =>
@@ -199,6 +201,70 @@ describe("resolveRedirects", () => {
         type: "redirect_web",
         url: "https://desktop-fallback.com",
       });
+    });
+  });
+
+  describe("clipboard copy", () => {
+    const customIos: LinkRedirectsInput = {
+      ...baseLink,
+      iosRedirectType: "custom",
+      iosRedirectURL: {
+        url: "https://ios-custom.com",
+        open_app_if_installed: false,
+      },
+    };
+
+    it("inherits the project flags when the link overrides nothing", () => {
+      const config = makeConfig({
+        show_preview_ios: true,
+        copy_to_clipboard_ios: true,
+      });
+      expect(resolveRedirects(customIos, config).ios.copyToClipboard).toBe(
+        true
+      );
+    });
+
+    it("stays off when the project preview is off", () => {
+      const config = makeConfig({
+        show_preview_ios: false,
+        copy_to_clipboard_ios: true,
+      });
+      expect(resolveRedirects(customIos, config).ios.copyToClipboard).toBe(
+        false
+      );
+    });
+
+    it("stays off when the link skips the preview", () => {
+      const config = makeConfig({
+        show_preview_ios: true,
+        copy_to_clipboard_ios: true,
+      });
+      const link: LinkRedirectsInput = { ...customIos, showPreviewIOS: false };
+      expect(resolveRedirects(link, config).ios.copyToClipboard).toBe(false);
+    });
+
+    it("lets the link override the project default", () => {
+      const config = makeConfig({
+        show_preview_android: true,
+        copy_to_clipboard_android: false,
+      });
+      const link: LinkRedirectsInput = {
+        ...baseLink,
+        androidRedirectType: "custom",
+        androidRedirectURL: {
+          url: "https://android-custom.com",
+          open_app_if_installed: false,
+        },
+        copyToClipboardAndroid: true,
+      };
+      expect(resolveRedirects(link, config).android.copyToClipboard).toBe(true);
+    });
+
+    it("is false on backends that don't send the flags", () => {
+      const config = makeConfig({ show_preview_ios: true });
+      expect(resolveRedirects(customIos, config).ios.copyToClipboard).toBe(
+        false
+      );
     });
   });
 

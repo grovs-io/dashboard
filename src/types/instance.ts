@@ -1,3 +1,25 @@
+export type AnalyticsPlan = "free" | "paid" | "enterprise" | "self_hosted";
+
+/** Plans with full retention and no upgrade path to sell. */
+export function isUnlimitedRetentionPlan(plan: AnalyticsPlan): boolean {
+  return plan === "enterprise" || plan === "self_hosted";
+}
+
+/**
+ * Plan-driven analytics retention window, surfaced on the instance payload so
+ * the FE can bound date pickers proactively instead of waiting for the backend
+ * to reject an out-of-range query.
+ */
+export interface AnalyticsRetention {
+  plan: AnalyticsPlan;
+  /** How far back analytics can be queried, in days. */
+  queryable_days: number;
+  /** Data older than this is "cold" — heavy query shapes are restricted. */
+  cold_after_days: number;
+  /** Whether heavy queries are allowed in the cold window. */
+  can_query_cold: boolean;
+}
+
 export interface Instance {
   id: string;
   name: string;
@@ -11,6 +33,9 @@ export interface Instance {
   uri_scheme: string;
   production: Project;
   test: Project;
+  // Optional: absent on older backend deploys / self-hosted; treat missing as
+  // "unbounded" rather than gating the UI.
+  analytics_retention?: AnalyticsRetention;
 }
 
 export interface Project {
@@ -62,6 +87,7 @@ export interface PlatformAppConfig {
     push_configuration?: {
       firebase_project_id?: string;
       certificate?: string;
+      configured?: boolean;
       [key: string]: unknown;
     };
     server_api_key?: {

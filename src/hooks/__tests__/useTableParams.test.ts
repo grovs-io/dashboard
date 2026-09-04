@@ -1,22 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
-// Track router.replace calls and provide controllable searchParams
+// Writes go through history.replaceState, so assert the resulting URL, not a router call.
 let mockSearchParams = new URLSearchParams();
-const mockReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
-  useRouter: () => ({ replace: mockReplace }),
-  usePathname: () => "/test-path",
 }));
 
 import { useTableParams } from "../useTableParams";
 
+const currentUrl = () => window.location.pathname + window.location.search;
+
+// Point both the mocked useSearchParams and the real URL at the same query string.
+const setUrl = (qs: string) => {
+  mockSearchParams = new URLSearchParams(qs);
+  window.history.replaceState(null, "", qs ? `/test-path?${qs}` : "/test-path");
+};
+
 describe("useTableParams", () => {
   beforeEach(() => {
-    mockSearchParams = new URLSearchParams();
-    mockReplace.mockClear();
+    setUrl("");
   });
 
   describe("defaults", () => {
@@ -72,21 +76,21 @@ describe("useTableParams", () => {
 
   describe("page from URL", () => {
     it("reads page from search params", () => {
-      mockSearchParams = new URLSearchParams("page=3");
+      setUrl("page=3");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.page).toBe(3);
     });
 
     it("clamps page to minimum of 1", () => {
-      mockSearchParams = new URLSearchParams("page=0");
+      setUrl("page=0");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.page).toBe(1);
     });
 
     it("falls back to 1 for invalid page values", () => {
-      mockSearchParams = new URLSearchParams("page=abc");
+      setUrl("page=abc");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.page).toBe(1);
@@ -101,9 +105,7 @@ describe("useTableParams", () => {
         result.current.setPage(5);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path?page=5", {
-        scroll: false,
-      });
+      expect(currentUrl()).toBe("/test-path?page=5");
     });
 
     it("removes page param when setting to page 1", () => {
@@ -113,13 +115,13 @@ describe("useTableParams", () => {
         result.current.setPage(1);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
   });
 
   describe("rowsPerPage from URL", () => {
     it("reads perPage from search params", () => {
-      mockSearchParams = new URLSearchParams("perPage=50");
+      setUrl("perPage=50");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.rowsPerPage).toBe(50);
@@ -128,22 +130,16 @@ describe("useTableParams", () => {
 
   describe("setRowsPerPage", () => {
     it("updates URL and resets page", () => {
-      mockSearchParams = new URLSearchParams("page=3");
+      setUrl("page=3");
       const { result } = renderHook(() => useTableParams());
 
       act(() => {
         result.current.setRowsPerPage(50);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.stringContaining("perPage=50"),
-        { scroll: false }
-      );
+      expect(currentUrl()).toContain("perPage=50");
       // page should be removed (reset)
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.not.stringContaining("page="),
-        { scroll: false }
-      );
+      expect(currentUrl()).not.toContain("page=");
     });
 
     it("removes perPage param when setting to default page size", () => {
@@ -153,20 +149,20 @@ describe("useTableParams", () => {
         result.current.setRowsPerPage(25); // default
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
   });
 
   describe("sort from URL", () => {
     it("reads sort from search params", () => {
-      mockSearchParams = new URLSearchParams("sort=name:asc");
+      setUrl("sort=name:asc");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.sort).toEqual({ sortKey: "name", ascending: true });
     });
 
     it("reads descending sort", () => {
-      mockSearchParams = new URLSearchParams("sort=name:desc");
+      setUrl("sort=name:desc");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.sort).toEqual({
@@ -184,9 +180,7 @@ describe("useTableParams", () => {
         result.current.setSort({ sortKey: "name", ascending: true });
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path?sort=name%3Aasc", {
-        scroll: false,
-      });
+      expect(currentUrl()).toBe("/test-path?sort=name%3Aasc");
     });
 
     it("removes sort param when setting to default sort", () => {
@@ -196,7 +190,7 @@ describe("useTableParams", () => {
         result.current.setSort({ sortKey: "updated_at", ascending: false });
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
 
     it("supports functional updates", () => {
@@ -206,16 +200,13 @@ describe("useTableParams", () => {
         result.current.setSort((prev) => ({ ...prev, ascending: true }));
       });
 
-      expect(mockReplace).toHaveBeenCalledWith(
-        "/test-path?sort=updated_at%3Aasc",
-        { scroll: false }
-      );
+      expect(currentUrl()).toBe("/test-path?sort=updated_at%3Aasc");
     });
   });
 
   describe("searchTerm", () => {
     it("reads search term from URL on mount", () => {
-      mockSearchParams = new URLSearchParams("q=hello");
+      setUrl("q=hello");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.searchTerm).toBe("hello");
@@ -236,7 +227,7 @@ describe("useTableParams", () => {
     it("reads date range from search params", () => {
       const from = "2024-06-01T00:00:00.000Z";
       const to = "2024-06-30T00:00:00.000Z";
-      mockSearchParams = new URLSearchParams(`from=${from}&to=${to}`);
+      setUrl(`from=${from}&to=${to}`);
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.dateRange?.from?.toISOString()).toBe(from);
@@ -254,24 +245,19 @@ describe("useTableParams", () => {
         result.current.setDateRange({ from, to });
       });
 
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.stringContaining("from="),
-        { scroll: false }
-      );
-      expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining("to="), {
-        scroll: false,
-      });
+      expect(currentUrl()).toContain("from=");
+      expect(currentUrl()).toContain("to=");
     });
 
     it("clears date params when range is undefined", () => {
-      mockSearchParams = new URLSearchParams("from=2024-01-01&to=2024-01-31");
+      setUrl("from=2024-01-01&to=2024-01-31");
       const { result } = renderHook(() => useTableParams());
 
       act(() => {
         result.current.setDateRange(undefined);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
 
     it("clears date params when from is missing", () => {
@@ -281,13 +267,13 @@ describe("useTableParams", () => {
         result.current.setDateRange({ from: undefined, to: new Date() });
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
   });
 
   describe("platform", () => {
     it("reads platform from URL", () => {
-      mockSearchParams = new URLSearchParams("platform=ios");
+      setUrl("platform=ios");
       const { result } = renderHook(() => useTableParams());
 
       expect(result.current.platform).toBe("ios");
@@ -307,20 +293,18 @@ describe("useTableParams", () => {
         result.current.setPlatform("android");
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path?platform=android", {
-        scroll: false,
-      });
+      expect(currentUrl()).toBe("/test-path?platform=android");
     });
 
     it("removes platform param when setting empty string", () => {
-      mockSearchParams = new URLSearchParams("platform=ios");
+      setUrl("platform=ios");
       const { result } = renderHook(() => useTableParams());
 
       act(() => {
         result.current.setPlatform("");
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
   });
 

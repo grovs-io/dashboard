@@ -14,19 +14,22 @@ import {
 } from "@/components/ui/dialog";
 import {
   useCustomDomainPreflightQuery,
-  useCustomDomainsQuery,
+  useCustomDomainsEnvelopeQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import { useMigrationSourceQuery } from "@/hooks/queries/useMigrationQueries";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
 import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMutations";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { isFeatureOff } from "@/lib/apiErrorHelpers";
+import { isManualCustomDomainMode } from "@/lib/customDomainStatus";
 import { queryKeys } from "@/lib/queryKeys";
 import { ApiError } from "@/lib/ApiError";
 import { showErrorNotification } from "@/lib/Notifications";
 import { config } from "@/lib/config";
+import { Skeleton } from "@/components/ui/skeleton";
 import ScaleUpDialog from "@/components/settings/ScaleUpDialog";
 import MigrationWizard from "./MigrationWizard";
+import { getHealthLabel } from "./getHealthLabel";
 
 interface MigrationEntryProps {
   projectId: string | undefined;
@@ -65,7 +68,8 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
   const createSubscriptionMutation = useCreateSubscriptionMutation(
     selectedInstance?.id
   );
-  const domainsQuery = useCustomDomainsQuery(projectId);
+  const domainsQuery = useCustomDomainsEnvelopeQuery(projectId);
+  const manualMode = isManualCustomDomainMode(domainsQuery.data?.tls_mode);
   const sourceQuery = useMigrationSourceQuery(projectId);
   const queryClient = useQueryClient();
 
@@ -85,7 +89,10 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
   };
 
   const migrationDomain = useMemo(
-    () => (domainsQuery.data ?? []).find((d) => d.purpose === "migration"),
+    () =>
+      (domainsQuery.data?.custom_domains ?? []).find(
+        (d) => d.purpose === "migration"
+      ),
     [domainsQuery.data]
   );
   const preflightQuery = useCustomDomainPreflightQuery(
@@ -94,10 +101,11 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
     {
       enabled:
         Boolean(projectId) &&
+        !manualMode &&
         migrationDomain?.status === "active" &&
         Boolean(sourceQuery.data),
       refetchInterval:
-        migrationDomain?.status === "active" && sourceQuery.data
+        !manualMode && migrationDomain?.status === "active" && sourceQuery.data
           ? 15000
           : false,
     }
@@ -109,21 +117,45 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
     return null;
   }
 
+  if (domainsQuery.isLoading || sourceQuery.isLoading) {
+    return (
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    );
+  }
+
   const hasMigrationProgress = Boolean(migrationDomain || sourceQuery.data);
   const migrationHostname =
     migrationDomain?.hostname ?? sourceQuery.data?.old_host;
   const migrationStatus =
     migrationDomain?.status ??
     (sourceQuery.data?.enabled ? "enabled" : "paused");
+  const providerHosted = sourceQuery.data?.provider_hosted === true;
+  const sourceHealth = sourceQuery.data
+    ? getHealthLabel(sourceQuery.data)
+    : null;
+  // Manual mode: "active" is authoritative, preflight is advisory only.
+  // Provider-hosted sources are live from creation — no domain row exists.
   const migrationIsLive =
-    migrationDomain?.status === "active" &&
-    Boolean(sourceQuery.data) &&
-    preflightQuery.data?.cname_matches === true;
+    providerHosted ||
+    (migrationDomain?.status === "active" &&
+      Boolean(sourceQuery.data) &&
+      (manualMode || preflightQuery.data?.cname_matches === true));
   const migrationIsReadyForDns =
+    !manualMode &&
     migrationDomain?.status === "active" &&
     Boolean(sourceQuery.data) &&
     preflightQuery.data?.cname_matches !== true;
   const migrationStatusLabel = (() => {
+    if (providerHosted && sourceHealth) return sourceHealth.label;
+    if (
+      manualMode &&
+      (migrationStatus === "pending" || migrationStatus === "provisioning")
+    ) {
+      return "Pending";
+    }
     if (migrationDomain?.ssl_status === "pending_deployment") {
       return "Deploying SSL";
     }
@@ -159,7 +191,7 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
   };
 
   const dialogBody =
-    hasPaidPlan || hasMigrationProgress ? (
+    hasPaidPlan || hasMigrationProgress || manualMode ? (
       <MigrationWizard
         projectId={projectId}
         onIdleCancel={() => handleOpenChange(false)}
@@ -215,7 +247,9 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
         </div>
       )}
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:!max-w-[49vw]">
+        {/* Header stays put; only the body scrolls, so the title and the
+            form's submit row never scroll out of reach. */}
+        <DialogContent className="grid max-h-[85dvh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:!max-w-[49vw]">
           {hasMigrationProgress ? (
             <DialogHeader>
               <DialogTitle>
@@ -236,7 +270,7 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
               </DialogDescription>
             </DialogHeader>
           )}
-          {dialogBody}
+          <div className="min-h-0 overflow-y-auto pr-1">{dialogBody}</div>
         </DialogContent>
       </Dialog>
       <ScaleUpDialog

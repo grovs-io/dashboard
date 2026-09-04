@@ -1,6 +1,18 @@
 import { format, startOfDay, endOfDay } from "date-fns";
 
 /**
+ * Parse a calendar date ("2026-03-17") as local midnight.
+ *
+ * `new Date("2026-03-17")` is parsed as UTC midnight, which renders as the
+ * previous day at any negative offset. Analytics buckets are calendar labels,
+ * not instants, so they must be read in the viewer's own day.
+ */
+export function parseCalendarDate(value: string): Date {
+  const [y = NaN, m = NaN, d = NaN] = value.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
  * Format a date for API requests: "yyyy-MM-dd HH:mm:ss"
  */
 export function formatApiDate(date: Date | string | number): string {

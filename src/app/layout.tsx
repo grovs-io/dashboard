@@ -9,6 +9,10 @@ import { AnalyticsProvider } from "@/analytics/AnalyticsProvider";
 import { WebVitals } from "@/analytics/WebVitals";
 import QueryProvider from "@/lib/QueryProvider";
 import Script from "next/script";
+import { GTM_ENABLED } from "@/lib/integrations";
+import { serializeRuntimeConfig } from "@/lib/serverRuntimeConfig";
+
+export const dynamic = "force-dynamic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,13 +47,27 @@ export const metadata: Metadata = {
   },
 };
 
-const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
+const GTM_ID = GTM_ENABLED ? process.env.NEXT_PUBLIC_GTM_ID : undefined;
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const apiUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+
+  if (!apiUrl) {
+    throw new Error("Missing runtime environment variable: API_URL");
+  }
+
   return (
     <html lang="en" suppressHydrationWarning className="">
+      <head>
+        <script
+          id="grovs-runtime-config"
+          dangerouslySetInnerHTML={{
+            __html: serializeRuntimeConfig(apiUrl),
+          }}
+        />
+      </head>
       {GTM_ID && (
         <Script
           id="gtm-script"

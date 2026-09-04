@@ -23,16 +23,14 @@ test.describe("Links Table", () => {
   }) => {
     await page.goto("/dynamic_links/links");
 
-    const createButton = page.getByRole("button", {
-      name: /create.*link|new.*link/i,
-    });
+    const createButton = page
+      .getByRole("button", { name: /create.*link|new.*link/i })
+      .first();
     await expect(createButton).toBeVisible({ timeout: 10_000 });
     await createButton.click();
 
     // Dialog should appear
-    await expect(
-      page.getByText(/create.*link/i).or(page.getByRole("dialog"))
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
   });
 
   test("active/archived toggle works", async ({ authenticatedPage: page }) => {

@@ -13,6 +13,7 @@ import { Skeleton } from "../ui/skeleton";
 import { BarChart3, Link2, Plus } from "lucide-react";
 import { useGlobalLinkDialog } from "@/context/useLinkDialogContext";
 import type { ChartDataPoint } from "@/types";
+import { parseCalendarDate } from "@/lib/dateUtils";
 
 const DashboardLinksView = React.memo(function DashboardLinksView({
   data,
@@ -41,7 +42,7 @@ const DashboardLinksView = React.memo(function DashboardLinksView({
       return;
     }
     const parsedData = Object.entries(data).map(([dateStr, users]) => {
-      const date = new Date(dateStr);
+      const date = parseCalendarDate(dateStr);
       const name = date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",

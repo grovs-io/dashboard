@@ -32,6 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import ClipboardToggle from "@/components/common/clipboard-toggle";
 import type { LucideIcon } from "lucide-react";
 
 type OptionItem = {
@@ -170,6 +171,10 @@ const CreateLinkAndroidRedirect = React.memo(
     androidLinkBehaviour,
     setAndroidLinkBehaviour,
     setShowPreviewAndroid,
+    copyToClipboardAndroid,
+    setCopyToClipboardAndroid,
+    projectShowPreviewAndroid,
+    projectCopyToClipboardAndroid,
     disabledActions,
     showErrors,
   }: {
@@ -182,10 +187,20 @@ const CreateLinkAndroidRedirect = React.memo(
     setAndroidRedirectType: (value: string) => void;
     setAndroidLinkBehaviour: (value: string) => void;
     setShowPreviewAndroid: (value: boolean | null) => void;
+    copyToClipboardAndroid: boolean | null;
+    setCopyToClipboardAndroid: (value: boolean | null) => void;
+    projectShowPreviewAndroid: boolean;
+    projectCopyToClipboardAndroid: boolean;
     disabledActions?: boolean;
     showErrors?: boolean;
   }) {
     const { resolvedTheme } = useTheme();
+    // "Default" inherits the project preview setting; the copy toggle rides on it.
+    const previewEnabled =
+      androidLinkBehaviour === DEFAULT
+        ? projectShowPreviewAndroid
+        : androidLinkBehaviour === SHOW_PREVIEWS;
+    const copyEnabled = copyToClipboardAndroid ?? projectCopyToClipboardAndroid;
     const url = androidRedirectURL?.url ?? "";
     const urlIsValid = httpUrlSchema.safeParse(url).success;
     const isHttps = url.startsWith("https://");
@@ -223,9 +238,18 @@ const CreateLinkAndroidRedirect = React.memo(
         <OptionDropdown
           options={REDIRECT_OPTIONS}
           value={androidRedirectType}
-          onChange={(value) =>
-            !disabledActions && setAndroidRedirectType(value)
-          }
+          onChange={(value) => {
+            if (disabledActions) return;
+            setAndroidRedirectType(value);
+            // Back to Default hides the preview and clipboard controls, so drop
+            // their overrides too — the link inherits the project's rules,
+            // exactly like a newly created one.
+            if (value === DEFAULT) {
+              setAndroidLinkBehaviour(DEFAULT);
+              setShowPreviewAndroid(null);
+              setCopyToClipboardAndroid(null);
+            }
+          }}
           disabled={disabledActions}
         />
 
@@ -321,6 +345,17 @@ const CreateLinkAndroidRedirect = React.memo(
                 disabled={disabledActions}
               />
             </div>
+
+            {previewEnabled && (
+              <ClipboardToggle
+                id="link-android-copy-to-clipboard"
+                checked={copyEnabled}
+                onCheckedChange={(checked) =>
+                  !disabledActions && setCopyToClipboardAndroid(checked)
+                }
+                disabled={disabledActions}
+              />
+            )}
           </>
         )}
       </div>

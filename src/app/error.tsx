@@ -1,10 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
-import Link from "next/link";
 import { capturePosthog } from "@/analytics/posthog";
 import { categorizeError } from "@/lib/errorUtils";
+import { ErrorState } from "@/components/common/ErrorState";
 
 export default function GlobalError({
   error,
@@ -24,17 +23,13 @@ export default function GlobalError({
   const { title, description } = categorizeError(error);
 
   return (
-    <div className="flex w-full flex-col items-center justify-center min-h-screen bg-muted text-center px-4">
-      <h2 className="text-2xl font-bold text-destructive">{title}</h2>
-      <p className="my-4 text-secondary-foreground">{description}</p>
-      <div className="flex items-center gap-3">
-        <Button onClick={() => reset()} className="px-4 py-2">
-          Try Again
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/dashboard">Go to Dashboard</Link>
-        </Button>
-      </div>
+    <div className="flex w-full min-h-screen items-center justify-center bg-background">
+      <ErrorState
+        title={title}
+        description={description}
+        onRetry={reset}
+        showDashboardLink
+      />
     </div>
   );
 }

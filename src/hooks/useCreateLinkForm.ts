@@ -52,6 +52,8 @@ const defaultValues: CreateLinkFormValues = {
   desktopRedirectType: DEFAULT,
   showPreviewAndroid: null,
   showPreviewIOS: null,
+  copyToClipboardAndroid: null,
+  copyToClipboardIOS: null,
 };
 
 export function useCreateLinkForm() {
@@ -87,6 +89,8 @@ export function useCreateLinkForm() {
   const desktopRedirectType = form.watch("desktopRedirectType");
   const showPreviewAndroid = form.watch("showPreviewAndroid");
   const showPreviewIOS = form.watch("showPreviewIOS");
+  const copyToClipboardAndroid = form.watch("copyToClipboardAndroid");
+  const copyToClipboardIOS = form.watch("copyToClipboardIOS");
 
   // --- Compatibility setters (accept SetStateAction to match Dispatch<SetStateAction<T>>) ---
   const setSection = useCallback(
@@ -303,6 +307,24 @@ export function useCreateLinkForm() {
       ),
     [form]
   );
+  const setCopyToClipboardAndroid = useCallback(
+    (v: SetStateAction<boolean | null>) =>
+      form.setValue(
+        "copyToClipboardAndroid",
+        resolveAction(v, form.getValues("copyToClipboardAndroid")),
+        { shouldDirty: true }
+      ),
+    [form]
+  );
+  const setCopyToClipboardIOS = useCallback(
+    (v: SetStateAction<boolean | null>) =>
+      form.setValue(
+        "copyToClipboardIOS",
+        resolveAction(v, form.getValues("copyToClipboardIOS")),
+        { shouldDirty: true }
+      ),
+    [form]
+  );
 
   // --- Validation helpers ---
 
@@ -409,6 +431,8 @@ export function useCreateLinkForm() {
         utmMedium: link.tracking_medium ?? "",
         showPreviewIOS: link.show_preview_ios ?? null,
         showPreviewAndroid: link.show_preview_android ?? null,
+        copyToClipboardIOS: link.copy_to_clipboard_ios ?? null,
+        copyToClipboardAndroid: link.copy_to_clipboard_android ?? null,
         iOSRedirectType: getRedirectType(link.ios_custom_redirect),
         androidRedirectType: getRedirectType(link.android_custom_redirect),
         desktopRedirectType: getRedirectType(link.desktop_custom_redirect),
@@ -470,6 +494,10 @@ export function useCreateLinkForm() {
       iOSRedirectURL !== null ||
       androidRedirectURL !== null ||
       desktopRedirectURL !== null ||
+      showPreviewIOS !== null ||
+      showPreviewAndroid !== null ||
+      copyToClipboardIOS !== null ||
+      copyToClipboardAndroid !== null ||
       utmCampaign !== "" ||
       utmMedium !== "" ||
       utmSource !== ""
@@ -594,6 +622,10 @@ export function useCreateLinkForm() {
     setShowPreviewAndroid,
     showPreviewIOS,
     setShowPreviewIOS,
+    copyToClipboardAndroid,
+    setCopyToClipboardAndroid,
+    copyToClipboardIOS,
+    setCopyToClipboardIOS,
 
     // Tracking
     utmCampaign,

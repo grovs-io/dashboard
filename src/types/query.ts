@@ -58,3 +58,56 @@ export interface GetMessagingParams {
   archived: boolean;
   term?: string;
 }
+
+// ─── Analytics param types ────────────────────────────────────────
+
+export interface AnalyticsDateRangeParams {
+  start_date?: string;
+  end_date?: string;
+  platform?: string;
+}
+
+export interface AnalyticsEventsParams extends AnalyticsDateRangeParams {
+  cursor?: string;
+  limit?: number;
+  search?: string;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
+  filters?: string; // JSON-encoded EventFilter[]
+  /** IANA zone the retention and range-cap guards judge the range in. */
+  timezone?: string;
+}
+
+export interface AnalyticsEventVolumeParams extends AnalyticsDateRangeParams {
+  bucket?: "hour" | "day" | "week";
+  search?: string;
+  filters?: string;
+  /** IANA zone the buckets are cut in, e.g. "Europe/Bucharest". */
+  timezone?: string;
+}
+
+export interface AnalyticsFieldValuesParams {
+  field: string;
+  q?: string;
+  limit?: number;
+  cursor?: string | number;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface AnalyticsOverviewParams extends AnalyticsDateRangeParams {
+  search?: string;
+  /** JSON-encoded filter array — unified filter contract shared with the Events explorer. */
+  filters?: string;
+}
+
+export interface OverviewKeyMetricSeriesParams extends AnalyticsDateRangeParams {
+  metric: string;
+}
+
+export interface AnalyticsRetentionSummaryParams {
+  start_date?: string;
+  end_date?: string;
+  platform?: string;
+  filters?: string;
+}

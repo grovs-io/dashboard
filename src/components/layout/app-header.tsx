@@ -160,7 +160,7 @@ export default function AppHeader({
   return (
     <div
       className={cn(
-        "flex flex-col sticky top-[0px] z-25 backdrop-blur-md",
+        "flex flex-col sticky top-[0px] z-25 backdrop-blur-md border-b border-sidebar-border",
         !showTestStyle && "bg-background/80"
       )}
       style={

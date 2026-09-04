@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SearchX } from "lucide-react";
 
 export interface DataTableProps<T> {
   columns: AccessorKeyColumnDef<T>[];
@@ -34,6 +35,7 @@ export interface DataTableProps<T> {
   headerClassName?: (columnId: string) => string | undefined;
   cellClassName?: (columnId: string) => string | undefined;
   skeletonCellClassName?: string;
+  footerContent?: React.ReactNode;
 }
 
 const DataTable = <T,>({
@@ -52,6 +54,7 @@ const DataTable = <T,>({
   headerClassName,
   cellClassName,
   skeletonCellClassName = "px-5 py-3",
+  footerContent,
 }: DataTableProps<T>) => {
   const visibleColumns = useMemo(() => {
     return columns.reduce(
@@ -79,7 +82,7 @@ const DataTable = <T,>({
 
   return (
     <div
-      className={containerClassName ?? defaultContainerClass}
+      className={cn("relative", containerClassName ?? defaultContainerClass)}
       aria-live="polite"
       aria-atomic="true"
     >
@@ -147,7 +150,7 @@ const DataTable = <T,>({
                 className={cn(
                   "bg-background border-sidebar-border",
                   onRowClick && "cursor-pointer",
-                  loading && "opacity-50 pointer-events-none"
+                  loading && "opacity-70 pointer-events-none"
                 )}
                 onClick={
                   onRowClick ? () => onRowClick(row.original) : undefined
@@ -168,13 +171,21 @@ const DataTable = <T,>({
             ))
           ) : hasFilters ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={columns.length} className="h-32 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No results found
-                </p>
-                <p className="text-xs text-muted-foreground/60 mt-1">
-                  Try adjusting your search or filters
-                </p>
+              <TableCell
+                colSpan={columns.length}
+                className="h-[calc(100vh-300px)]"
+              >
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                  <SearchX className="size-10 text-muted-foreground/40" />
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No results found
+                    </p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">
+                      Try adjusting your search or filters
+                    </p>
+                  </div>
+                </div>
               </TableCell>
             </TableRow>
           ) : (
@@ -184,6 +195,13 @@ const DataTable = <T,>({
                 className="p-0 whitespace-normal"
               >
                 {emptyState}
+              </TableCell>
+            </TableRow>
+          )}
+          {footerContent && (
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={columns.length} className="p-0">
+                {footerContent}
               </TableCell>
             </TableRow>
           )}

@@ -11,7 +11,7 @@ test.describe("Login", () => {
     await page.goto("/login");
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
-    await expect(page.getByRole("button", { name: /login/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^login$/i })).toBeVisible();
   });
 
   test("successful login redirects to dashboard", async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe("Login", () => {
 
     await page.getByLabel("Email").fill(TEST_USER.email);
     await page.getByLabel("Password").fill(TEST_USER.password);
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /^login$/i }).click();
 
     await page.waitForURL("**/dashboard**", { timeout: 10_000 });
     await expect(page).toHaveURL(/dashboard/);
@@ -27,7 +27,7 @@ test.describe("Login", () => {
 
   test("invalid credentials shows error notification", async ({ page }) => {
     // Override the token endpoint to return an error
-    await page.route("**/oauth/token", async (route) => {
+    await page.route("**/api/auth/token", async (route) => {
       await route.fulfill({
         status: 401,
         contentType: "application/json",
@@ -38,7 +38,7 @@ test.describe("Login", () => {
     await page.goto("/login");
     await page.getByLabel("Email").fill("wrong@example.com");
     await page.getByLabel("Password").fill("wrongpassword");
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /^login$/i }).click();
 
     await expect(page.getByText(/credentials are invalid/i)).toBeVisible({
       timeout: 5000,
@@ -49,7 +49,7 @@ test.describe("Login", () => {
     await page.goto("/login?backTo=%2Fsettings");
     await page.getByLabel("Email").fill(TEST_USER.email);
     await page.getByLabel("Password").fill(TEST_USER.password);
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /^login$/i }).click();
 
     await page.waitForURL("**/settings**", { timeout: 10_000 });
     await expect(page).toHaveURL(/settings/);
@@ -83,23 +83,24 @@ test.describe("Login", () => {
     await page.goto("/login");
     await page.getByLabel("Email").fill("test@example.com");
     await page.getByLabel("Password").fill("password123");
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /^login$/i }).click();
 
     await expect(page.getByLabel("OTP")).toBeVisible({ timeout: 5000 });
   });
 
   test("sign in button is disabled with empty fields", async ({ page }) => {
     await page.goto("/login");
-    const signInButton = page.getByRole("button", { name: /login/i });
+    const signInButton = page.getByRole("button", { name: /^login$/i });
     await expect(signInButton).toBeDisabled();
   });
 
   test("SSO buttons are visible", async ({ page }) => {
     await page.goto("/login");
     await expect(
-      page
-        .getByRole("button", { name: /google/i })
-        .or(page.getByText(/google/i))
+      page.getByRole("button", { name: /login with google/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /login with microsoft/i })
     ).toBeVisible();
   });
 });

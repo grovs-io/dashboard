@@ -9,7 +9,7 @@ services:
     ports:
       - "3036:3000" # host:container
     env_file:
-      - .env.local # automatically load env vars from here
+      - .env.preview # automatically load env vars from here
     restart: unless-stopped # auto-restart if crashed
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]

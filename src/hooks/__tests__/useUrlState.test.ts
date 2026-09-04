@@ -1,21 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
+// Writes go through history.replaceState, so assert the resulting URL, not a router call.
 let mockSearchParams = new URLSearchParams();
-const mockReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
-  useRouter: () => ({ replace: mockReplace }),
-  usePathname: () => "/test-path",
 }));
 
 import { useUrlState } from "../useUrlState";
 
+const currentUrl = () => window.location.pathname + window.location.search;
+
+// Point both the mocked useSearchParams and the real URL at the same query string.
+const setUrl = (qs: string) => {
+  mockSearchParams = new URLSearchParams(qs);
+  window.history.replaceState(null, "", qs ? `/test-path?${qs}` : "/test-path");
+};
+
 describe("useUrlState", () => {
   beforeEach(() => {
-    mockSearchParams = new URLSearchParams();
-    mockReplace.mockClear();
+    setUrl("");
   });
 
   describe("string mode (no parse/serialize options)", () => {
@@ -26,68 +31,60 @@ describe("useUrlState", () => {
     });
 
     it("returns URL value when key exists in URL", () => {
-      mockSearchParams = new URLSearchParams("tab=settings");
+      setUrl("tab=settings");
       const { result } = renderHook(() => useUrlState("tab", "overview"));
 
       expect(result.current[0]).toBe("settings");
     });
 
-    it("sets value in URL via router.replace", () => {
+    it("sets value in URL", () => {
       const { result } = renderHook(() => useUrlState("tab", "overview"));
 
       act(() => {
         result.current[1]("settings");
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path?tab=settings", {
-        scroll: false,
-      });
+      expect(currentUrl()).toBe("/test-path?tab=settings");
     });
 
     it("removes param when setting value equal to default", () => {
-      mockSearchParams = new URLSearchParams("tab=settings");
+      setUrl("tab=settings");
       const { result } = renderHook(() => useUrlState("tab", "overview"));
 
       act(() => {
         result.current[1]("overview");
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
 
     it("removes param when setting empty string", () => {
-      mockSearchParams = new URLSearchParams("tab=settings");
+      setUrl("tab=settings");
       const { result } = renderHook(() => useUrlState("tab", "overview"));
 
       act(() => {
         result.current[1]("");
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
 
     it("preserves other existing URL params", () => {
-      mockSearchParams = new URLSearchParams("page=2&tab=overview");
+      setUrl("page=2&tab=overview");
       const { result } = renderHook(() => useUrlState("tab", "overview"));
 
       act(() => {
         result.current[1]("settings");
       });
 
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.stringContaining("page=2"),
-        { scroll: false }
-      );
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.stringContaining("tab=settings"),
-        { scroll: false }
-      );
+      expect(currentUrl()).toContain("page=2");
+      expect(currentUrl()).toContain("tab=settings");
     });
   });
 
   describe("with parse option", () => {
     it("parses URL value using parse function", () => {
-      mockSearchParams = new URLSearchParams("count=42");
+      setUrl("count=42");
       const { result } = renderHook(() =>
         useUrlState("count", 0, { parse: (v) => parseInt(v, 10) })
       );
@@ -117,9 +114,7 @@ describe("useUrlState", () => {
         result.current[1](42);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path?count=42", {
-        scroll: false,
-      });
+      expect(currentUrl()).toBe("/test-path?count=42");
     });
 
     it("removes param when serialized value equals serialized default", () => {
@@ -134,13 +129,13 @@ describe("useUrlState", () => {
         result.current[1](0);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path", { scroll: false });
+      expect(currentUrl()).toBe("/test-path");
     });
   });
 
   describe("with boolean state", () => {
     it("parses boolean from URL", () => {
-      mockSearchParams = new URLSearchParams("active=true");
+      setUrl("active=true");
       const { result } = renderHook(() =>
         useUrlState("active", false, {
           parse: (v) => v === "true",
@@ -163,15 +158,13 @@ describe("useUrlState", () => {
         result.current[1](true);
       });
 
-      expect(mockReplace).toHaveBeenCalledWith("/test-path?active=true", {
-        scroll: false,
-      });
+      expect(currentUrl()).toBe("/test-path?active=true");
     });
   });
 
   describe("multiple keys do not interfere", () => {
     it("handles two different URL state keys independently", () => {
-      mockSearchParams = new URLSearchParams("tab=settings&view=grid");
+      setUrl("tab=settings&view=grid");
 
       const { result: tabResult } = renderHook(() =>
         useUrlState("tab", "overview")

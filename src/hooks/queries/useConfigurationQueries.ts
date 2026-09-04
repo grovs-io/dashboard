@@ -15,6 +15,8 @@ import type {
   DomainDefaults,
   CustomDomain,
   CustomDomainPreflight,
+  CustomDomainResponse,
+  CustomDomainsListResponse,
 } from "@/types";
 
 const CUSTOM_DOMAIN_POLL_MS = 30000;
@@ -112,31 +114,58 @@ export function useDomainDefaultsQuery(projectId: string | undefined) {
   });
 }
 
-export function useCustomDomainQuery(projectId: string | undefined) {
-  return useQuery<CustomDomain | null>({
+// Cache holds the full envelope; row-shaped hooks `select` from the same entry.
+function customDomainQueryOptions(projectId: string | undefined) {
+  return {
     queryKey: queryKeys.projects.customDomain(projectId!),
     queryFn: async () => {
       const response = await getCustomDomainAPICall(projectId!);
-      return response.data.custom_domain;
+      return response.data;
     },
     enabled: !!projectId,
     retry: false,
     refetchOnWindowFocus: true,
-    refetchInterval: (query) => customDomainRefetchInterval(query.state.data),
+    refetchInterval: (query) =>
+      customDomainRefetchInterval(query.state.data?.custom_domain),
+  } satisfies UseQueryOptions<CustomDomainResponse>;
+}
+
+export function useCustomDomainEnvelopeQuery(projectId: string | undefined) {
+  return useQuery<CustomDomainResponse>(customDomainQueryOptions(projectId));
+}
+
+export function useCustomDomainQuery(projectId: string | undefined) {
+  return useQuery<CustomDomainResponse, Error, CustomDomain | null>({
+    ...customDomainQueryOptions(projectId),
+    select: (data) => data.custom_domain,
   });
 }
 
-export function useCustomDomainsQuery(projectId: string | undefined) {
-  return useQuery<CustomDomain[]>({
+function customDomainsQueryOptions(projectId: string | undefined) {
+  return {
     queryKey: queryKeys.projects.customDomains(projectId!),
     queryFn: async () => {
       const response = await getCustomDomainsAPICall(projectId!);
-      return response.data.custom_domains;
+      return response.data;
     },
     enabled: !!projectId,
     retry: false,
     refetchOnWindowFocus: true,
-    refetchInterval: (query) => customDomainsRefetchInterval(query.state.data),
+    refetchInterval: (query) =>
+      customDomainsRefetchInterval(query.state.data?.custom_domains),
+  } satisfies UseQueryOptions<CustomDomainsListResponse>;
+}
+
+export function useCustomDomainsEnvelopeQuery(projectId: string | undefined) {
+  return useQuery<CustomDomainsListResponse>(
+    customDomainsQueryOptions(projectId)
+  );
+}
+
+export function useCustomDomainsQuery(projectId: string | undefined) {
+  return useQuery<CustomDomainsListResponse, Error, CustomDomain[]>({
+    ...customDomainsQueryOptions(projectId),
+    select: (data) => data.custom_domains,
   });
 }
 

@@ -85,9 +85,8 @@ const CredentialsFields = ({
           </button>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Grovs uses this key to look up the original Branch link when someone
-          opens an old URL, then creates the matching Grovs link before
-          redirecting. Find it under Account Settings → Branch Key.
+          Used to look up original Branch links. Branch dashboard: Account
+          Settings → Branch Key.
         </p>
       </div>
     );
@@ -116,8 +115,7 @@ const CredentialsFields = ({
           }
         />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Grovs uses this AppsFlyer OneLink ID to match incoming legacy links
-          before creating the corresponding Grovs link.
+          Used to match incoming legacy AppsFlyer links.
         </p>
       </div>
       <div className="flex flex-col gap-2">
@@ -155,10 +153,8 @@ const CredentialsFields = ({
           </button>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Grovs uses this token to read the original AppsFlyer link details
-          during migration. In AppsFlyer, open your account menu and go to
-          Security Center → Manage your AppsFlyer API tokens (on older
-          dashboards: Settings → API tokens), then copy the V2.0 token.
+          The V2.0 token, from AppsFlyer → Security Center → Manage your
+          AppsFlyer API tokens (older dashboards: Settings → API tokens).
         </p>
       </div>
     </>

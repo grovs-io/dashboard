@@ -121,7 +121,58 @@ export interface DnsSetupChecklistProps {
   domain: CustomDomain;
   preflight?: CustomDomainPreflight | null;
   preflightPending?: boolean;
+  // Callers derive this via isManualCustomDomainMode, so the SaaS build gate holds.
+  manualMode?: boolean;
 }
+
+// Manual mode renders the backend's ordered setup_records; ordering is load-bearing.
+const ManualSetupChecklist = ({ domain }: { domain: CustomDomain }) => {
+  const records = domain.setup_records ?? [];
+
+  if (records.length === 0) {
+    return domain.cname_target ? (
+      <div className="rounded-lg border border-sidebar-border bg-background overflow-hidden">
+        <DnsRow label="Type" value="CNAME" />
+        <DnsRow label="Host" value={domain.hostname} copyable />
+        <DnsRow label="Value" value={domain.cname_target} copyable />
+      </div>
+    ) : (
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        This deployment didn&apos;t provide setup instructions — contact your
+        administrator.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {records.map((record, index) => (
+        <div key={index} className="flex items-start gap-2.5">
+          <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-muted-foreground/40 text-[10px] font-semibold text-muted-foreground shrink-0">
+            {index + 1}
+          </span>
+          <div className="flex flex-1 flex-col gap-2 min-w-0">
+            <span className="text-sm font-medium">
+              {record.kind === "certificate"
+                ? "Attach an SSL certificate"
+                : "Point your DNS"}
+            </span>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {record.note}
+            </p>
+            {record.name && record.value && (
+              <div className="rounded-lg border border-sidebar-border bg-background overflow-hidden">
+                {record.type && <DnsRow label="Type" value={record.type} />}
+                <DnsRow label="Host" value={record.name} copyable />
+                <DnsRow label="Value" value={record.value} copyable />
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 /**
  * The three-step DNS verification checklist shared by the migration wizard
@@ -143,7 +194,25 @@ const DnsSetupChecklist = ({
   domain,
   preflight = null,
   preflightPending = false,
+  manualMode = false,
 }: DnsSetupChecklistProps) => {
+  if (manualMode) {
+    return <ManualSetupChecklist domain={domain} />;
+  }
+  return (
+    <CloudflareSetupChecklist
+      domain={domain}
+      preflight={preflight}
+      preflightPending={preflightPending}
+    />
+  );
+};
+
+const CloudflareSetupChecklist = ({
+  domain,
+  preflight = null,
+  preflightPending = false,
+}: Omit<DnsSetupChecklistProps, "manualMode">) => {
   const sslIssued = domain.ssl_status === "active";
   const sslDeploying = domain.ssl_status === "pending_deployment";
   const ownershipTxtName = blankToNull(domain.ownership_verification_txt_name);
@@ -257,7 +326,9 @@ const DnsSetupChecklist = ({
               <div className="rounded-lg border border-sidebar-border bg-background overflow-hidden">
                 <DnsRow label="Type" value="CNAME" />
                 <DnsRow label="Host" value={domain.hostname} copyable />
-                <DnsRow label="Value" value={domain.cname_target} copyable />
+                {domain.cname_target && (
+                  <DnsRow label="Value" value={domain.cname_target} copyable />
+                )}
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Names vary by provider — your DNS UI may call{" "}

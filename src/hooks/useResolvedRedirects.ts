@@ -7,6 +7,7 @@ export type ResolvedPlatformRedirect = {
   type: "redirect_web" | "app_or_fallback" | "generated_page";
   url: string;
   showPreview: boolean | null;
+  copyToClipboard: boolean;
   appStoreRedirect: boolean;
 };
 
@@ -26,6 +27,8 @@ export type LinkRedirectsInput = {
   desktopRedirectType: string;
   showPreviewAndroid: boolean | null;
   showPreviewIOS: boolean | null;
+  copyToClipboardAndroid: boolean | null;
+  copyToClipboardIOS: boolean | null;
 };
 
 export function resolveRedirects(
@@ -33,6 +36,20 @@ export function resolveRedirects(
   projectConfig: RedirectConfig | null
 ): ResolvedRedirects {
   const fallbackUrl = projectConfig?.default_fallback ?? "";
+
+  // The copy only happens on the preview page, so it inherits that gate.
+  const iosShowPreview =
+    link.showPreviewIOS ?? projectConfig?.show_preview_ios ?? false;
+  const androidShowPreview =
+    link.showPreviewAndroid ?? projectConfig?.show_preview_android ?? false;
+  const iosCopyToClipboard =
+    iosShowPreview &&
+    (link.copyToClipboardIOS ?? projectConfig?.copy_to_clipboard_ios ?? false);
+  const androidCopyToClipboard =
+    androidShowPreview &&
+    (link.copyToClipboardAndroid ??
+      projectConfig?.copy_to_clipboard_android ??
+      false);
 
   const resolveIOS = (): ResolvedPlatformRedirect => {
     if (link.iosRedirectType !== DEFAULT && link.iosRedirectURL) {
@@ -43,8 +60,8 @@ export function resolveRedirects(
         source: "custom",
         type: isAppOrFallback ? "app_or_fallback" : "redirect_web",
         url: link.iosRedirectURL.url ?? "",
-        showPreview:
-          link.showPreviewIOS ?? projectConfig?.show_preview_ios ?? false,
+        showPreview: iosShowPreview,
+        copyToClipboard: iosCopyToClipboard,
         appStoreRedirect: false,
       };
     }
@@ -55,8 +72,8 @@ export function resolveRedirects(
         source: "default",
         type: "app_or_fallback",
         url: iosConfig.appstore ? "" : iosConfig.fallback_url || fallbackUrl,
-        showPreview:
-          link.showPreviewIOS ?? projectConfig?.show_preview_ios ?? false,
+        showPreview: iosShowPreview,
+        copyToClipboard: iosCopyToClipboard,
         appStoreRedirect: !!iosConfig.appstore,
       };
     }
@@ -66,6 +83,7 @@ export function resolveRedirects(
       type: "redirect_web",
       url: iosConfig?.fallback_url || fallbackUrl,
       showPreview: null,
+      copyToClipboard: false,
       appStoreRedirect: false,
     };
   };
@@ -79,10 +97,8 @@ export function resolveRedirects(
         source: "custom",
         type: isAppOrFallback ? "app_or_fallback" : "redirect_web",
         url: link.androidRedirectURL.url ?? "",
-        showPreview:
-          link.showPreviewAndroid ??
-          projectConfig?.show_preview_android ??
-          false,
+        showPreview: androidShowPreview,
+        copyToClipboard: androidCopyToClipboard,
         appStoreRedirect: false,
       };
     }
@@ -95,10 +111,8 @@ export function resolveRedirects(
         url: androidConfig.appstore
           ? ""
           : androidConfig.fallback_url || fallbackUrl,
-        showPreview:
-          link.showPreviewAndroid ??
-          projectConfig?.show_preview_android ??
-          false,
+        showPreview: androidShowPreview,
+        copyToClipboard: androidCopyToClipboard,
         appStoreRedirect: !!androidConfig.appstore,
       };
     }
@@ -108,6 +122,7 @@ export function resolveRedirects(
       type: "redirect_web",
       url: androidConfig?.fallback_url || fallbackUrl,
       showPreview: null,
+      copyToClipboard: false,
       appStoreRedirect: false,
     };
   };
@@ -120,6 +135,7 @@ export function resolveRedirects(
         type: "redirect_web",
         url: link.desktopRedirectURL.url ?? "",
         showPreview: null,
+        copyToClipboard: false,
         appStoreRedirect: false,
       };
     }
@@ -131,6 +147,7 @@ export function resolveRedirects(
         type: "generated_page",
         url: "",
         showPreview: null,
+        copyToClipboard: false,
         appStoreRedirect: true,
       };
     }
@@ -140,6 +157,7 @@ export function resolveRedirects(
       type: "redirect_web",
       url: desktopConfig?.fallback_url || fallbackUrl,
       showPreview: null,
+      copyToClipboard: false,
       appStoreRedirect: false,
     };
   };

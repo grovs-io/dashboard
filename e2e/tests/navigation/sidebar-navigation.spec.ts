@@ -15,8 +15,12 @@ test.describe("Sidebar Navigation", () => {
   test("navigates to links page", async ({ authenticatedPage: page }) => {
     await page.goto("/dashboard");
 
-    // Click on Links navigation
-    const linksNav = page.getByRole("link", { name: /links/i }).first();
+    // "Links" only renders once its "Dynamic Links" group is expanded
+    await page
+      .getByRole("button", { name: /dynamic links/i })
+      .first()
+      .click();
+    const linksNav = page.getByRole("link", { name: /^links$/i }).first();
     await expect(linksNav).toBeVisible({ timeout: 10_000 });
     await linksNav.click();
 

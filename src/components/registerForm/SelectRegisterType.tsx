@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { useUserContext } from "@/context/useUserContext";
 import LocalStorage from "@/lib/LocalStorage";
+import { SSO_LOGIN } from "@/constants/OptionsConstants";
 import googleIcon from "@/assets/icons/generic/Google.svg";
 import microsoftIcon from "@/assets/icons/generic/Microsoft.svg";
 import Image from "next/image";
@@ -21,141 +22,24 @@ export function SelectRegisterType({ className, ...props }: LoginFormProps) {
     router.replace("/register/with_email");
   };
 
-  const handleSSOAuthWindow = (
-    authWindow: Window | null,
-    redirectURL: string,
-    onSuccess: (response: {
-      authToken: string | null;
-      refreshToken: string | null;
-      redirectUrl: string;
-    }) => void,
-    onFailure: (error?: Error) => void
-  ) => {
-    // Open a popup window for authentication
-    authWindow = window.open(
-      redirectURL,
-      "SSOAuthWindow",
-      "width=600,height=700"
-    );
-
-    if (!authWindow) {
-      onFailure(
-        new Error(
-          "Popup window was blocked. Please allow popups for this site."
-        )
-      );
-      return;
-    }
-
-    const currentHost = window.location.origin;
-    let authCompleted = false;
-
-    // Poll frequently to detect URL changes
-    const checkInterval = setInterval(() => {
-      if (authWindow.closed) {
-        clearInterval(checkInterval);
-
-        if (!authCompleted) {
-          onFailure(
-            new Error("Authentication window was closed before completion")
-          );
-        }
-        return;
-      }
-
-      try {
-        // This will throw if cross-origin
-        const currentUrl = authWindow.location.href;
-
-        // Check if we're back on our domain
-        if (authWindow.location.origin === currentHost) {
-          authCompleted = true;
-          clearInterval(checkInterval);
-
-          // Extract tokens from URL before any further redirects happen
-          const url = new URL(currentUrl);
-          const params = new URLSearchParams(url.search);
-
-          // Get tokens from URL parameters
-          const authToken =
-            params.get("token") ||
-            params.get("auth_token") ||
-            params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-
-          // Store tokens in sessionStorage
-          if (authToken) {
-            sessionStorage.setItem("authToken", authToken);
-          }
-
-          if (refreshToken) {
-            sessionStorage.setItem("refreshToken", refreshToken);
-          }
-
-          // Close the window
-          authWindow.close();
-
-          // Trigger success callback with the tokens
-          onSuccess({ authToken, refreshToken, redirectUrl: currentUrl });
-        }
-      } catch {
-        // Cross-origin error - still in external auth flow
-      }
-    }, 50); // Poll frequently to catch the redirect quickly
-  };
-
   const loginWithSSO = async (
     e: React.MouseEvent<HTMLButtonElement>,
     sso: string
   ) => {
     e.preventDefault();
-    const width = 600;
-    const height = 700;
+    LocalStorage.setLoginType(SSO_LOGIN);
 
-    const topWindow = window.top ?? window;
-
-    const y =
-      (topWindow.outerHeight ?? window.innerHeight) / 2 +
-      (topWindow.screenY ?? 0) -
-      height / 2;
-
-    const x =
-      (topWindow.outerWidth ?? window.innerWidth) / 2 +
-      (topWindow.screenX ?? 0) -
-      width / 2;
-
-    const authWindow = window.open(
-      "",
-      "SSOAuthWindow",
-      `toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,resizable=no,copyhistory=no,width=${width},height=${height},top=${y},left=${x}`
-    );
-    // setIsLoading(true);
     try {
       const response = await getSSOAuthenticationLink(sso);
-      // setIsLoading(false);
       const redirectURL = response.data.redirect_url;
-      handleSSOAuthWindow(
-        authWindow,
-        redirectURL,
-        (returnData: {
-          authToken: string | null;
-          refreshToken: string | null;
-          redirectUrl: string;
-        }) => {
-          // Success callback
-          if (returnData.authToken != null && returnData.refreshToken != null) {
-            LocalStorage.setAuthenticationToken(returnData.authToken);
-            LocalStorage.setRefreshToken(returnData.refreshToken);
-            sessionStorage.removeItem("authToken");
-            sessionStorage.removeItem("refreshToken");
-          }
-        },
-        () => {
-          // Failure callback — silently ignored
-        }
-      );
+
+      // Full-page redirect to the provider. The backend completes the flow by
+      // redirecting back to the app root with tokens in the URL, which the root
+      // page captures. This works reliably on both desktop and mobile, unlike a
+      // popup (mobile browsers block popups opened after an async call).
+      window.location.href = redirectURL;
     } catch {
-      // setIsLoading(false);
+      // Keep the user on the page if the auth link could not be fetched.
     }
   };
 

@@ -11,9 +11,10 @@ export interface DismissGetStartedPayload {
   get_started_dismissed?: boolean;
 }
 
+/** Omit both to export the instance's whole history — the chart's picker doesn't scope it. */
 export interface ExportUsagePayload {
-  start_date: string;
-  end_date: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface RevenueCollectionPayload {

@@ -8,12 +8,22 @@ import {
 } from "../ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { BarChart3 } from "lucide-react";
+import { Skeleton } from "../ui/skeleton";
 import type { ChartDataPoint } from "@/types";
+import { parseCalendarDate } from "@/lib/dateUtils";
+
+// Fixed heights — a random pattern would differ between renders.
+const SKELETON_BAR_HEIGHTS = [
+  38, 62, 48, 75, 55, 88, 70, 45, 60, 82, 52, 68, 95, 58, 72, 42, 65, 80, 50,
+  90, 63, 47, 78, 56,
+];
 
 const SettingsActiveUsersChart = React.memo(function SettingsActiveUsersChart({
   data,
+  loading = false,
 }: {
   data: Record<string, number> | null;
+  loading?: boolean;
 }) {
   const [fullData, setFullData] = useState<ChartDataPoint[]>([]);
 
@@ -33,7 +43,7 @@ const SettingsActiveUsersChart = React.memo(function SettingsActiveUsersChart({
     }
 
     const parsedData = Object.entries(data)?.map(([dateStr, users]) => {
-      const date = new Date(dateStr);
+      const date = parseCalendarDate(dateStr);
       const name = date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -43,6 +53,22 @@ const SettingsActiveUsersChart = React.memo(function SettingsActiveUsersChart({
     });
     setFullData(parsedData);
   }, [data]);
+
+  if (loading) {
+    return (
+      <div className="min-w-0 pr-6">
+        <div className="flex h-[300px] items-end gap-1.5 px-6 pb-8">
+          {SKELETON_BAR_HEIGHTS.map((height, i) => (
+            <Skeleton
+              key={i}
+              className="flex-1 rounded-t-md rounded-b-none"
+              style={{ height: `${height}%` }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const isEmpty =
     fullData.length === 0 ||

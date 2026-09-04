@@ -6,9 +6,7 @@ test.describe("Messaging Table", () => {
 
     // Should show the messaging page (with table or empty state)
     await expect(
-      page
-        .getByText(/messages|messaging/i)
-        .or(page.getByText(/no.*messages|create.*first/i))
+      page.getByRole("heading", { name: /no messages yet/i })
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -17,8 +15,8 @@ test.describe("Messaging Table", () => {
   }) => {
     await page.goto("/messaging");
 
-    await expect(page.getByRole("button", { name: /create|new/i })).toBeVisible(
-      { timeout: 10_000 }
-    );
+    await expect(
+      page.getByRole("button", { name: /create message/i }).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

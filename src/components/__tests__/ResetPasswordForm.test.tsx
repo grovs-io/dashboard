@@ -81,10 +81,10 @@ describe("ResetPasswordForm", () => {
   it("shows 'Did not receive' link only when linkSent is true", () => {
     const { rerender } = render(<TestResetPasswordForm linkSent={false} />);
 
-    expect(screen.queryByText(/Did not receive/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/receive the email/i)).not.toBeInTheDocument();
 
     rerender(<TestResetPasswordForm linkSent={true} />);
-    expect(screen.getByText(/Did not receive/)).toBeInTheDocument();
+    expect(screen.getByText(/receive the email/i)).toBeInTheDocument();
   });
 
   it("submit button is disabled when form is invalid", () => {

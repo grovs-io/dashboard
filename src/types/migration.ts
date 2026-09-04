@@ -11,6 +11,8 @@ export interface MigrationSource {
   id: number;
   provider: MigrationProvider;
   old_host: string;
+  provider_hosted: boolean;
+  extra_hosts: string[];
   enabled: boolean;
   health: MigrationHealth;
   consecutive_failures: number;
@@ -36,12 +38,22 @@ export interface CreateMigrationPayload {
   hostname: string;
   provider: MigrationProvider;
   credentials: MigrationCredentials;
+  provider_hosted?: true;
+  extra_hosts?: string[];
 }
 
-export interface CreateMigrationResponse {
+export interface CreateClassicMigrationResponse {
   migration_source: MigrationSource;
   custom_domain: import("./configuration").CustomDomain;
 }
+
+export interface CreateProviderHostedMigrationResponse {
+  migration_source: MigrationSource;
+}
+
+export type CreateMigrationResponse =
+  | CreateClassicMigrationResponse
+  | CreateProviderHostedMigrationResponse;
 
 export interface CreateMigrationSourcePayload {
   provider: MigrationProvider;
@@ -52,6 +64,7 @@ export interface CreateMigrationSourcePayload {
 export interface UpdateMigrationSourcePayload {
   enabled?: boolean;
   credentials?: MigrationCredentials;
+  extra_hosts?: string[];
 }
 
 export interface MigrationTestResponse {

@@ -4,6 +4,7 @@ import React from "react";
 import { Button } from "../ui/button";
 import MemberSectionElement from "./MemberSectionElement";
 import AddNewMemberDialog from "./AddNewMemberDialog";
+import AdminOnlyDisplay from "@/lib/adminOnlyDisplay";
 import type { InstanceMember } from "@/types";
 
 const TeamMebersSection = ({
@@ -30,14 +31,16 @@ const TeamMebersSection = ({
             Manage who has access to this project.
           </span>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setInviteDialogOpen(true)}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add member
-        </Button>
+        <AdminOnlyDisplay>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInviteDialogOpen(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add member
+          </Button>
+        </AdminOnlyDisplay>
       </div>
 
       {/* Table */}

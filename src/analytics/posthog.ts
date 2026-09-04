@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { POSTHOG_ENABLED } from "@/lib/integrations";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST =
@@ -8,10 +9,7 @@ let isInitialized = false;
 
 export function initPosthog() {
   if (typeof window === "undefined") return;
-  if (!POSTHOG_KEY) {
-    console.warn("PostHog key not configured");
-    return;
-  }
+  if (!POSTHOG_ENABLED || !POSTHOG_KEY) return;
   if (isInitialized) return;
 
   const isProduction = process.env.NEXT_PUBLIC_ENV === "production";

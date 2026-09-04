@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${API_URL:-}" ]; then
+  echo "[grovs-dashboard] ERROR: required runtime environment variable API_URL is not set" >&2
+  exit 1
+fi
+
+exec "$@"

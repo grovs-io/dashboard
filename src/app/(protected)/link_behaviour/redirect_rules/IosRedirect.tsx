@@ -21,6 +21,7 @@ import iosIconDark from "@/assets/icons/generic/Apple_dark_mode.svg";
 import { useRef } from "react";
 import { useTheme } from "next-themes";
 import OptionCard from "./OptionCard";
+import ClipboardToggle from "@/components/common/clipboard-toggle";
 import Link from "next/link";
 import { useFormContext } from "react-hook-form";
 import type { RedirectRulesFormValues } from "@/schemas/redirect";
@@ -41,6 +42,7 @@ const IosRedirect = ({
   const iosStore = watch("ios.appStore");
   const customUrl = watch("ios.customUrl");
   const iosShowPreview = watch("ios.showPreview");
+  const iosCopyToClipboard = watch("ios.copyToClipboard");
 
   const { resolvedTheme } = useTheme();
   const urlIsValid =
@@ -106,6 +108,11 @@ const IosRedirect = ({
               setValue(
                 "ios.showPreview",
                 defaultValues?.ios?.showPreview ?? false,
+                { shouldDirty: true }
+              );
+              setValue(
+                "ios.copyToClipboard",
+                defaultValues?.ios?.copyToClipboard ?? false,
                 { shouldDirty: true }
               );
               setTimeout(
@@ -190,6 +197,15 @@ const IosRedirect = ({
             description="Redirects immediately with no intermediate page. Faster, but some browsers may not open the app correctly."
           />
         </div>
+        {iosShowPreview && (
+          <ClipboardToggle
+            id="ios-copy-to-clipboard"
+            checked={iosCopyToClipboard}
+            onCheckedChange={(checked) =>
+              setValue("ios.copyToClipboard", checked, { shouldDirty: true })
+            }
+          />
+        )}
       </div>
 
       {/* Redirect to App: options */}

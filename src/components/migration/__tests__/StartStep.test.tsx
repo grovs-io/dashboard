@@ -33,7 +33,7 @@ function chooseProvider(name: RegExp) {
 }
 
 describe("StartStep", () => {
-  it("renders the provider dropdown and neutral subdomain field on mount", () => {
+  it("renders only the provider dropdown on mount", () => {
     setup();
     expect(
       screen.getByRole("button", { name: /select source platform/i })
@@ -41,7 +41,14 @@ describe("StartStep", () => {
     expect(screen.getAllByText(/branch or appsflyer/i).length).toBeGreaterThan(
       0
     );
-    expect(screen.getByLabelText(/provider subdomain/i)).toBeInTheDocument();
+    // Everything below the dropdown waits for a provider choice.
+    expect(screen.queryByLabelText(/subdomain/i)).not.toBeInTheDocument();
+  });
+
+  it("reveals the subdomain field once a provider is chosen", () => {
+    setup();
+    chooseProvider(/branch/i);
+    expect(screen.getByLabelText(/branch subdomain/i)).toBeInTheDocument();
   });
 
   it("reveals credentials fields only after a provider is chosen", () => {
@@ -101,6 +108,8 @@ describe("StartStep", () => {
       provider: "branch",
       hostname: "old.acme.com",
       credentials: { branch_key: "key_live_abc123" },
+      providerHosted: false,
+      extraHosts: [],
     });
   });
 
@@ -124,6 +133,8 @@ describe("StartStep", () => {
       provider: "appsflyer",
       hostname: "links.acme.com",
       credentials: { onelink_id: "abc123", api_token: "tok_xyz" },
+      providerHosted: false,
+      extraHosts: [],
     });
   });
 

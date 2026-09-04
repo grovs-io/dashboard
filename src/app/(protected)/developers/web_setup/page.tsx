@@ -90,7 +90,9 @@ const SetupOverview = ({
             <Globe className="h-5 w-5 text-muted-foreground" />
           </div>
           <div className="flex flex-col gap-0.5 flex-1">
-            <span className="text-sm font-semibold">Web Setup</span>
+            <span className="text-[18px] font-semibold tracking-tight">
+              Web Setup
+            </span>
             <span className="text-xs text-muted-foreground">
               Your Web SDK is configured and ready to use.
             </span>
@@ -434,17 +436,22 @@ const WebSetupPage = () => {
     };
   }, [hasAnyChanges, router]);
 
-  // Mark all steps visited for returning users, auto-enter wizard for first-time
+  // Mark all steps visited for returning users, auto-enter wizard for first-time.
+  // Reads instanceConfig directly: sdkConfigured lags one render behind (set via effect),
+  // so branching on it here would force wizard mode for configured users on every load.
   useEffect(() => {
     if (!instanceConfig) return;
-    if (sdkConfigured) {
+    const found = instanceConfig.find(
+      (config: PlatformAppConfig) => config.platform === WEB
+    );
+    if ((found?.configuration?.domains?.length ?? 0) > 0) {
       setVisitedSteps(ALL_STEP_INDICES);
     } else {
       setCurrentStep(0);
       setVisitedSteps(new Set([0]));
       setWizardMode(true);
     }
-  }, [sdkConfigured, instanceConfig]);
+  }, [instanceConfig]);
 
   const goToStep = useCallback(
     (step: number) => {

@@ -85,6 +85,55 @@ export function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
+/**
+ * Format a Date as a YYYY-MM-DD string for API query params, using the user's
+ * LOCAL calendar date. `toISOString()` would convert to UTC first, which shifts
+ * the date by a day for users east/west of UTC (e.g. "Today" at UTC+3 midnight
+ * serializes as yesterday) — corrupting "today" ranges and inflating clamped
+ * windows by a day. The day picker works in local time, so the param must too.
+ */
+export function formatDateParam(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format a Date as a local "YYYY-MM-DD HH:mm:ss" string for time-aware API
+ * range params. Local (not UTC) for the same reason as {@link formatDateParam}.
+ */
+export function formatDateTimeParam(d: Date): string {
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const seconds = String(d.getSeconds()).padStart(2, "0");
+  return `${formatDateParam(d)} ${hours}:${minutes}:${seconds}`;
+}
+
+const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+/** Convert an ISO 3166-1 alpha-2 country code to its full name. */
+export function countryName(code: string): string {
+  if (!code) return "";
+  try {
+    return regionNames.of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Format a number for compact display (e.g. 1200 → "1.2K") */
+export function fmt(n: number): string {
+  if (n == null) return "0";
+  if (n >= 1000) {
+    const k = n / 1000;
+    return k >= 10
+      ? `${Math.round(k)}K`
+      : `${k.toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return n.toLocaleString();
+}
+
 export function formatPlatformName(platform: string) {
   if (!platform) return "";
 

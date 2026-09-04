@@ -19,7 +19,7 @@ const OptionCard = ({
     type="button"
     onClick={onClick}
     className={cn(
-      "flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all",
+      "flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all",
       selected
         ? "border-valid-green/30 bg-valid-green/5 ring-[2px] ring-valid-green/10"
         : "border-sidebar-border bg-secondary hover:bg-muted"
@@ -27,7 +27,7 @@ const OptionCard = ({
   >
     <div
       className={cn(
-        "flex items-center justify-center w-8 h-8 rounded-md border shrink-0",
+        "flex items-center justify-center w-8 h-8 rounded-lg border shrink-0",
         selected
           ? "bg-valid-green-light border-valid-green/20"
           : "bg-background border-sidebar-border"

@@ -5,9 +5,11 @@ import { ACCOUNT_LOGIN, SSO_LOGIN } from "@/constants/OptionsConstants";
 import { useUserContext } from "@/context/useUserContext";
 
 import LocalStorage from "@/lib/LocalStorage";
+import SessionStorage from "@/lib/SessionStorage";
 import { useEffect, useRef, useState } from "react";
 import { showErrorNotification } from "@/lib/Notifications";
 import { ApiError } from "@/lib/ApiError";
+import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useForm } from "react-hook-form";
@@ -17,12 +19,10 @@ import {
   loginWithOtpSchema,
   type LoginFormValues,
 } from "@/schemas/auth";
-
-interface SSOReturnData {
-  authToken: string | null;
-  refreshToken: string | null;
-  redirectUrl: string;
-}
+import { ENTERPRISE_SSO, type SSOLogin } from "@/api/auth/userService";
+import { useSSOProviders } from "@/hooks/useSSOProviders";
+import { useSSODiscovery, type SsoDiscovery } from "@/hooks/useSSODiscovery";
+import { getSsoRefusal } from "@/lib/ApiError";
 
 const LOGIN_DEFAULT_VALUES: LoginFormValues = {
   email: "",
@@ -34,16 +34,27 @@ export default function LoginPage() {
   const { loginUser, getSSOAuthenticationLink, userRef, isHydrated } =
     useUserContext();
   const [otpEnabled, setOtpEnabled] = useState<boolean>(false);
+  const ssoProviders = useSSOProviders();
   const searchParams = useSearchParams();
   const router = useRouter();
+  // A 403 refusal from the password grant pins the enterprise state for that email.
+  const [refusal, setRefusal] = useState<
+    (SsoDiscovery & { email: string }) | null
+  >(null);
 
   const backToRef = useRef<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(otpEnabled ? loginWithOtpSchema : loginSchema),
     mode: "onChange",
-    defaultValues: LOGIN_DEFAULT_VALUES,
+    defaultValues: {
+      ...LOGIN_DEFAULT_VALUES,
+      email: searchParams.get("email") ?? "",
+    },
   });
+  const email = form.watch("email");
+  const discovery = useSSODiscovery(email);
+  const enterprise = refusal?.email === email ? refusal : discovery;
 
   const handleLogin = async (data: LoginFormValues): Promise<void> => {
     LocalStorage.setLoginType(ACCOUNT_LOGIN);
@@ -63,14 +74,37 @@ export default function LoginPage() {
       if (otpEnabled) {
         form.setValue("otp", "");
       }
-      if (
-        error instanceof ApiError &&
-        (error.data as Record<string, unknown>)?.error === "invalid_grant"
-      ) {
+
+      // signInAPICall uses plain axios (it targets the relative BFF route), so
+      // it throws an AxiosError rather than an ApiError. Pull the error body
+      // out of whichever shape we got so login failures actually surface.
+      const errorData = (
+        axios.isAxiosError(error)
+          ? error.response?.data
+          : error instanceof ApiError
+            ? error.data
+            : undefined
+      ) as Record<string, unknown> | undefined;
+
+      const ssoRefusal = getSsoRefusal(error);
+      if (ssoRefusal) {
+        setRefusal({
+          email: data.email,
+          connectionId: ssoRefusal.sso_connection_id,
+          enforce: true,
+        });
+        showErrorNotification(ssoRefusal.error);
+      } else if (errorData?.error === "invalid_grant") {
         showErrorNotification(
           otpEnabled
             ? "Invalid OTP code. Please try again."
             : "Provided credentials are invalid"
+        );
+      } else if (axios.isAxiosError(error)) {
+        showErrorNotification(
+          (errorData?.error_description as string) ??
+            (errorData?.error as string) ??
+            "Login failed. Please try again."
         );
       } else if (error instanceof ApiError) {
         showErrorNotification(error.message);
@@ -78,137 +112,45 @@ export default function LoginPage() {
     }
   };
 
-  const handleSSOAuthWindow = (
-    authWindow: Window | null,
-    redirectURL: string,
-    onSuccess: (data: SSOReturnData) => void,
-    onFailure: (error: Error) => void
-  ): void => {
-    // Open a popup window for authentication
-    authWindow = window.open(
-      redirectURL,
-      "SSOAuthWindow",
-      "width=600,height=700"
-    );
-
-    if (!authWindow) {
-      onFailure(
-        new Error(
-          "Popup window was blocked. Please allow popups for this site."
-        )
-      );
-      return;
-    }
-
-    const currentHost = window.location.origin;
-    let authCompleted = false;
-
-    // Poll frequently to detect URL changes
-    const checkInterval = setInterval(() => {
-      if (authWindow!.closed) {
-        clearInterval(checkInterval);
-
-        if (!authCompleted) {
-          onFailure(
-            new Error("Authentication window was closed before completion")
-          );
-        }
-        return;
-      }
-
-      try {
-        // This will throw if cross-origin
-        const currentUrl = authWindow!.location.href;
-
-        // Check if we're back on our domain
-        if (authWindow!.location.origin === currentHost) {
-          authCompleted = true;
-          clearInterval(checkInterval);
-
-          // Extract tokens from URL before any further redirects happen
-          const url = new URL(currentUrl);
-          const params = new URLSearchParams(url.search);
-
-          // Get tokens from URL parameters
-          const authToken =
-            params.get("token") ||
-            params.get("auth_token") ||
-            params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-
-          // Store tokens temporarily in sessionStorage before transferring to localStorage
-          if (authToken) {
-            window.sessionStorage.setItem("authToken", authToken);
-          }
-
-          if (refreshToken) {
-            window.sessionStorage.setItem("refreshToken", refreshToken);
-          }
-
-          // Close the window
-          authWindow!.close();
-
-          // Trigger success callback with the tokens
-          onSuccess({ authToken, refreshToken, redirectUrl: currentUrl });
-        }
-      } catch {
-        // Cross-origin error - still in external auth flow
-      }
-    }, 50); // Poll frequently to catch the redirect quickly
-  };
-
-  const loginWithSSO = async (sso: string): Promise<void> => {
-    const width = 600;
-    const height = 700;
-
-    const top = window.top;
-    const y = top
-      ? top.outerHeight / 2 + top.screenY - height / 2
-      : window.outerHeight / 2 + window.screenY - height / 2;
-    const x = top
-      ? top.outerWidth / 2 + top.screenX - width / 2
-      : window.outerWidth / 2 + window.screenX - width / 2;
-
-    const authWindow = window.open(
-      "",
-      "SSOAuthWindow",
-      `toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=${width}, height=${height}, top=${y}, left=${x}`
-    );
-
+  const loginWithSSO = async (sso: SSOLogin): Promise<void> => {
     LocalStorage.setLoginType(SSO_LOGIN);
+    SessionStorage.setSsoEmail(form.getValues("email"));
 
     try {
-      const response = await getSSOAuthenticationLink(sso);
-
+      const response =
+        sso === ENTERPRISE_SSO
+          ? await getSSOAuthenticationLink(sso, {
+              connection_id: enterprise.connectionId,
+              email: form.getValues("email"),
+            })
+          : await getSSOAuthenticationLink(sso);
       const redirectURL: string = response.data.redirect_url;
-      handleSSOAuthWindow(
-        authWindow,
-        redirectURL,
-        (returnData: SSOReturnData) => {
-          // Success callback
-          if (returnData.authToken != null && returnData.refreshToken != null) {
-            LocalStorage.setAuthenticationToken(returnData.authToken);
-            LocalStorage.setRefreshToken(returnData.refreshToken);
-            sessionStorage.removeItem("authToken");
-            sessionStorage.removeItem("refreshToken");
-          }
 
-          if (backToRef.current) {
-            router.push(backToRef.current);
-          } else {
-            router.push("/");
-          }
-        },
-        () => {
-          // Failure callback — silently ignored
-        }
-      );
-    } catch {}
+      // Full-page redirect to the provider. The backend completes the flow by
+      // redirecting back to the app root with tokens in the URL, which the root
+      // page captures. This works reliably on both desktop and mobile, unlike a
+      // popup (mobile browsers block popups opened after an async call).
+      window.location.href = redirectURL;
+    } catch {
+      showErrorNotification("Could not start SSO sign-in. Please try again.");
+    }
   };
 
   useEffect(() => {
     backToRef.current = searchParams.get("backTo");
   }, [searchParams]);
+
+  // SSO failures come back as a ?error= redirect; show it, then strip it.
+  useEffect(() => {
+    const ssoError = searchParams.get("error");
+    if (ssoError) {
+      const remembered = SessionStorage.takeSsoEmail();
+      if (remembered)
+        form.setValue("email", remembered, { shouldValidate: true });
+      showErrorNotification(ssoError);
+      router.replace("/login");
+    }
+  }, [searchParams, router, form]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -227,6 +169,9 @@ export default function LoginPage() {
           otpEnabled={otpEnabled}
           handleLogin={form.handleSubmit(handleLogin)}
           loginWithSSO={loginWithSSO}
+          ssoProviders={ssoProviders}
+          enterpriseConnectionId={enterprise.connectionId}
+          enterpriseEnforced={enterprise.enforce}
         />
       </div>
     </div>

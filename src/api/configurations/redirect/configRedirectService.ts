@@ -39,12 +39,16 @@ export const setDefaultRedirectAPICall = async (
   projectId: string,
   default_fallback: string,
   showAndroidPreview: boolean,
-  showIosPreview: boolean
+  showIosPreview: boolean,
+  copyToClipboardAndroid: boolean,
+  copyToClipboardIos: boolean
 ): Promise<AxiosResponse<RedirectConfigResponse>> => {
   const data = {
     default_fallback: default_fallback,
     show_preview_android: showAndroidPreview,
     show_preview_ios: showIosPreview,
+    copy_to_clipboard_android: copyToClipboardAndroid,
+    copy_to_clipboard_ios: copyToClipboardIos,
   };
 
   return PUT(config.apiPath + `/projects/${projectId}/redirect_config`, data);

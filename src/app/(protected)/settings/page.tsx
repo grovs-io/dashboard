@@ -55,6 +55,8 @@ import InviteLinkDialog from "@/components/settings/InviteLinkDialog";
 import ActionConfirm from "@/components/common/action-confirm";
 import { IS_ENTERPRISE, IS_SELF_HOSTED } from "@/lib/edition";
 import MigrationDeepLinkRedirect from "./MigrationDeepLinkRedirect";
+import SsoSection from "@/components/settings/sso/SsoSection";
+import { useSsoAccess } from "@/hooks/queries/useSsoQueries";
 
 const SettingsPage = () => {
   const { selectedInstance, setSelectedInstance } = useProjectSelection();
@@ -69,6 +71,7 @@ const SettingsPage = () => {
   const revenueCollectionMutation = useSetRevenueCollectionMutation();
 
   const subscriptionQuery = useSubscriptionQuery(selectedInstance?.id);
+  const ssoAccess = useSsoAccess(selectedInstance?.id);
   const mauQuery = useMauQuery(selectedInstance?.id);
   const subscription = subscriptionQuery.data?.subscription ?? null;
   const isEnterprisePlan = subscriptionQuery.data?.isEnterprise ?? false;
@@ -179,18 +182,12 @@ const SettingsPage = () => {
     }
   };
 
-  const handleExport = async (
-    instanceId: string,
-    _date: DateRange | undefined
-  ) => {
-    const dataObj = {
-      start_date: formatApiDate(dateRange!.from!),
-      end_date: formatApiDate(dateRange!.to!),
-    };
+  // Deliberately unscoped by the picker: the export always covers all history.
+  const handleExport = async (instanceId: string) => {
     try {
       const response = await exportUsageMutation.mutateAsync({
         id: instanceId,
-        data: dataObj,
+        data: {},
       });
       showSuccessNotification(response.data.message);
     } catch {
@@ -222,6 +219,11 @@ const SettingsPage = () => {
   };
 
   const displayMauLimitReach = () => {
+    // Self-hosted has no plan to upgrade — never show the limit alert.
+    if (IS_SELF_HOSTED) {
+      return;
+    }
+
     if (!planLoaded) {
       return;
     }
@@ -296,7 +298,7 @@ const SettingsPage = () => {
       <MigrationDeepLinkRedirect />
       {IS_SELF_HOSTED && (
         <InviteLinkDialog
-          inviteUrl={inviteLink}
+          links={inviteLink ? [{ url: inviteLink }] : null}
           onOpenChange={(open) => !open && setInviteLink(null)}
         />
       )}
@@ -342,8 +344,7 @@ const SettingsPage = () => {
                     variant="outline"
                     size="sm"
                     onClick={() =>
-                      selectedInstance &&
-                      handleExport(selectedInstance.id, dateRange)
+                      selectedInstance && handleExport(selectedInstance.id)
                     }
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -351,7 +352,10 @@ const SettingsPage = () => {
                   </Button>
                 </div>
               </div>
-              <SettingsActiveUsersChart data={overviewMetrics} />
+              <SettingsActiveUsersChart
+                data={overviewMetrics}
+                loading={eventsPaymentQuery.isFetching}
+              />
             </div>
 
             <Separator />
@@ -373,6 +377,13 @@ const SettingsPage = () => {
                 inviteDialogOpen={inviteDialogOpen}
                 setInviteDialogOpen={setInviteDialogOpen}
               />
+
+              {ssoAccess.allowed && selectedInstance?.id && (
+                <>
+                  <Separator className="my-8" />
+                  <SsoSection instanceId={selectedInstance.id} />
+                </>
+              )}
 
               {IS_ENTERPRISE && (
                 <>

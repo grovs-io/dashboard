@@ -122,7 +122,17 @@ const TrackingPage = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-0 px-6 py-4 max-w-[800px]">
+            <div className="flex flex-col gap-0 px-6 pt-6 pb-16 max-w-[800px]">
+              <div className="mb-7">
+                <h2 className="text-[18px] font-semibold tracking-tight">
+                  Tracking
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Connect analytics to measure link performance across this
+                  project.
+                </p>
+              </div>
+
               {/* Google Analytics section */}
               <div className="flex flex-col gap-5">
                 <div className="flex items-center gap-3">

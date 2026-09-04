@@ -4,11 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "@/lib/ApiError";
 
 vi.mock("@/hooks/queries/useConfigurationQueries", () => ({
-  // Setup uses the plural list; the dialog (rendered when opened) still
-  // uses the singular shim until the next release.
-  useCustomDomainsQuery: vi.fn(),
-  useCustomDomainQuery: vi.fn(),
+  // Setup uses the plural list envelope; the dialog the singular one.
+  useCustomDomainsEnvelopeQuery: vi.fn(),
+  useCustomDomainEnvelopeQuery: vi.fn(),
   useCustomDomainPreflightQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/edition", () => ({
+  IS_ENTERPRISE: false,
+  IS_SELF_HOSTED: true,
 }));
 
 vi.mock("@/hooks/queries/usePaymentsQueries", () => ({
@@ -26,6 +30,7 @@ vi.mock("@/context/useProjectSelection", () => ({
 vi.mock("@/hooks/mutations/useConfigurationMutations", () => ({
   useAddCustomDomainMutation: vi.fn(),
   useRemoveCustomDomainMutation: vi.fn(),
+  useVerifyCustomDomainMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/mutations/usePaymentsMutations", () => ({
@@ -47,8 +52,8 @@ vi.mock("@/lib/config", () => ({
 }));
 
 import {
-  useCustomDomainsQuery,
-  useCustomDomainQuery,
+  useCustomDomainsEnvelopeQuery,
+  useCustomDomainEnvelopeQuery,
   useCustomDomainPreflightQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
@@ -57,12 +62,14 @@ import { useProjectSelection } from "@/context/useProjectSelection";
 import {
   useAddCustomDomainMutation,
   useRemoveCustomDomainMutation,
+  useVerifyCustomDomainMutation,
 } from "@/hooks/mutations/useConfigurationMutations";
 import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMutations";
 import CustomDomainSetup from "../configuration/CustomDomainSetup";
 
-const mockedQuery = vi.mocked(useCustomDomainsQuery);
-const mockedSingularQuery = vi.mocked(useCustomDomainQuery);
+const mockedQuery = vi.mocked(useCustomDomainsEnvelopeQuery);
+const mockedSingularQuery = vi.mocked(useCustomDomainEnvelopeQuery);
+const mockedVerifyMutation = vi.mocked(useVerifyCustomDomainMutation);
 const mockedPreflightQuery = vi.mocked(useCustomDomainPreflightQuery);
 const mockedSubscription = vi.mocked(useSubscriptionQuery);
 const mockedInstanceDetails = vi.mocked(useInstanceDetailsQuery);
@@ -78,14 +85,19 @@ const renderWithClient = (ui: React.ReactElement) =>
     <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
   );
 
-function setQuery(partial: Record<string, unknown>) {
+// `data` is the rows array; the helper wraps it in the list envelope.
+function setQuery(
+  partial: Record<string, unknown>,
+  envelope: Record<string, unknown> = {}
+) {
+  const { data, ...rest } = partial as { data?: unknown };
   mockedQuery.mockReturnValue({
-    data: [],
+    data: { custom_domains: data ?? [], ...envelope },
     isLoading: false,
     isError: false,
     error: null,
     refetch: vi.fn(),
-    ...partial,
+    ...rest,
   } as never);
 }
 
@@ -116,13 +128,17 @@ describe("CustomDomainSetup", () => {
     mockedCreateSubscription.mockReturnValue({
       mutateAsync: vi.fn(),
     } as never);
-    // Default singular-query stub for the dialog rendered on open.
+    // Default singular-envelope stub for the dialog rendered on open.
     mockedSingularQuery.mockReturnValue({
-      data: null,
+      data: { custom_domain: null },
       isLoading: false,
       isError: false,
       error: null,
       refetch: vi.fn(),
+    } as never);
+    mockedVerifyMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
     } as never);
     mockedPreflightQuery.mockReturnValue({
       data: null,
@@ -137,6 +153,14 @@ describe("CustomDomainSetup", () => {
       <CustomDomainSetup projectId="p1" />
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows a skeleton while the domain list is loading", () => {
+    setQuery({ data: undefined, isLoading: true });
+    renderWithClient(<CustomDomainSetup projectId="p1" />);
+    expect(
+      screen.queryByRole("button", { name: /use your own subdomain/i })
+    ).toBeNull();
   });
 
   it("shows the entry button in the None state", () => {
@@ -352,5 +376,52 @@ describe("CustomDomainSetup", () => {
     expect(
       screen.getByRole("button", { name: /use your own subdomain/i })
     ).toBeInTheDocument();
+  });
+
+  describe("manual mode", () => {
+    const manualEnvelope = {
+      tls_mode: "manual",
+      ingress_host: "links.app.com",
+    };
+    const activeManualRow = {
+      hostname: "links.acme.com",
+      purpose: "primary",
+      status: "active",
+      ssl_status: null,
+      cname_target: "links.app.com",
+      setup_records: [],
+    };
+
+    it("shows Manage for an active manual row even when the CNAME preflight fails", () => {
+      setQuery({ data: [activeManualRow] }, manualEnvelope);
+      mockedPreflightQuery.mockReturnValue({
+        data: { hostname: "links.acme.com", cname_matches: false },
+        isFetching: false,
+        isLoading: false,
+      } as never);
+      renderWithClient(<CustomDomainSetup projectId="p1" />);
+      expect(
+        screen.getByRole("button", { name: /manage/i })
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Verifying")).toBeNull();
+    });
+
+    it("opens the dialog to the add form, not the upsell, without a paid plan", () => {
+      setQuery({ data: [] }, manualEnvelope);
+      setSubscription(null);
+      mockedSingularQuery.mockReturnValue({
+        data: { custom_domain: null, ...manualEnvelope },
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never);
+      renderWithClient(<CustomDomainSetup projectId="p1" />);
+      fireEvent.click(
+        screen.getByRole("button", { name: /use your own subdomain/i })
+      );
+      expect(screen.queryByText(/requires a paid plan/i)).toBeNull();
+      expect(screen.getByPlaceholderText("links.acme.com")).toBeInTheDocument();
+    });
   });
 });

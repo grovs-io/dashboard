@@ -47,10 +47,12 @@ describe("migration source service", () => {
     await deleteMigrationSourceAPICall("p1");
     expect(DELETE).toHaveBeenCalledWith("/api/v1/projects/p1/migration_source");
   });
-  it("test", async () => {
+  it("test opts out of retries like the other migration_source calls", async () => {
     await testMigrationSourceAPICall("p1");
     expect(POST).toHaveBeenCalledWith(
-      "/api/v1/projects/p1/migration_source/test"
+      "/api/v1/projects/p1/migration_source/test",
+      undefined,
+      { maxRetries: 0 }
     );
   });
 });

@@ -29,6 +29,9 @@ import DeleteConfirm from "@/components/common/delete-confirm";
 import DnsSetupChecklist, {
   DnsRow,
 } from "@/components/common/dns-setup-checklist";
+import ManualVerifyPanel, {
+  verifyFailureNotice,
+} from "@/components/common/ManualVerifyPanel";
 import { cn } from "@/lib/utils";
 import { config } from "@/lib/config";
 import { showRetryableError } from "@/lib/Notifications";
@@ -38,6 +41,7 @@ import {
   isCustomDomainFailedLike,
   isCustomDomainInFlight,
   isLegacyCustomDomainPayload,
+  isManualCustomDomainMode,
   preflightCnameVerdict,
 } from "@/lib/customDomainStatus";
 import {
@@ -45,12 +49,13 @@ import {
   setupVerificationNotices,
 } from "@/lib/verificationErrors";
 import {
-  useCustomDomainQuery,
+  useCustomDomainEnvelopeQuery,
   useCustomDomainPreflightQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import {
   useAddCustomDomainMutation,
   useRemoveCustomDomainMutation,
+  useVerifyCustomDomainMutation,
 } from "@/hooks/mutations/useConfigurationMutations";
 
 // Light client check: ASCII, valid hostname, >= 3 labels (i.e. a subdomain,
@@ -302,23 +307,30 @@ const CustomDomainDialog = ({
   iosIntegrated: boolean;
   androidIntegrated: boolean;
 }) => {
-  const { data, isLoading, isError, refetch } = useCustomDomainQuery(projectId);
+  const envelopeQuery = useCustomDomainEnvelopeQuery(projectId);
+  const { isLoading, isError, refetch } = envelopeQuery;
+  const data = envelopeQuery.data?.custom_domain ?? null;
+  const manualMode = isManualCustomDomainMode(envelopeQuery.data?.tls_mode);
+  const ingressHost = envelopeQuery.data?.ingress_host ?? null;
   const addMutation = useAddCustomDomainMutation(projectId);
   const removeMutation = useRemoveCustomDomainMutation(projectId);
+  const verifyMutation = useVerifyCustomDomainMutation(projectId);
 
   // Like the migration wizard, the CNAME flip is detected via the preflight
   // endpoint: Cloudflare can mark the hostname + SSL "active" from the TXT
   // challenges alone, before the customer has pointed any traffic at Grovs.
   // Legacy payloads (pre-TXT-contract backends) have no preflight endpoint,
-  // so don't poll one that can only 404.
-  const isLegacy = !!data && isLegacyCustomDomainPayload(data);
+  // so don't poll one that can only 404. Manual mode skips preflight (A/ALIAS
+  // operators legitimately fail the CNAME check).
+  const isLegacy =
+    !!data && isLegacyCustomDomainPayload(data, envelopeQuery.data?.tls_mode);
   const inSetup =
     !!data && (isCustomDomainInFlight(data.status) || data.status === "active");
   const preflightQuery = useCustomDomainPreflightQuery(
     projectId,
     data?.hostname,
     {
-      enabled: hasPaidPlan && inSetup && !isLegacy,
+      enabled: hasPaidPlan && inSetup && !isLegacy && !manualMode,
       // Stop polling once the CNAME is confirmed — there is nothing left for
       // the lookup to detect while the dialog sits open on a live domain.
       refetchInterval: (query) =>
@@ -331,13 +343,16 @@ const CustomDomainDialog = ({
   // "not_pointed" requires a real DNS answer (NXDOMAIN counts; resolver
   // timeouts don't) — see preflightCnameVerdict. Anything inconclusive lets
   // an "active" domain render as live, matching the previous behavior on
-  // deploys without the preflight endpoint.
+  // deploys without the preflight endpoint. Manual mode: "active" is authoritative.
   const cnameKnownNotPointed =
-    preflightCnameVerdict(preflight) === "not_pointed";
+    !manualMode && preflightCnameVerdict(preflight) === "not_pointed";
   // Distinguish "preflight hasn't answered yet" (first open) from "preflight
   // unavailable" so the live view doesn't flash before the first response.
   const preflightSettling =
-    data?.status === "active" && !isLegacy && preflightQuery.isLoading;
+    data?.status === "active" &&
+    !isLegacy &&
+    !manualMode &&
+    preflightQuery.isLoading;
   const failedLike = !!data && isCustomDomainFailedLike(data);
   const inDnsSetup =
     !!data &&
@@ -348,6 +363,18 @@ const CustomDomainDialog = ({
   // starts fresh on every open (no stale draft or error on reopen).
   const [hostname, setHostname] = useState("");
   const [inlineError, setInlineError] = useState<InlineError | null>(null);
+  // Transport-level verify failures; probe failures live on the row itself.
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
+
+  const handleVerify = async () => {
+    if (!data) return;
+    setVerifyNotice(null);
+    try {
+      await verifyMutation.mutateAsync(data.hostname);
+    } catch (err) {
+      setVerifyNotice(verifyFailureNotice(err));
+    }
+  };
 
   const submitHostname = async (value: string) => {
     setInlineError(null);
@@ -359,10 +386,12 @@ const CustomDomainDialog = ({
       const status = getApiErrorStatus(err);
       if (status === 502) {
         showRetryableError(
-          getApiErrorMessage(
-            err,
-            "Temporary error reaching Cloudflare. Please try again."
-          ),
+          manualMode
+            ? "Temporary error reaching the server. Please try again."
+            : getApiErrorMessage(
+                err,
+                "Temporary error reaching Cloudflare. Please try again."
+              ),
           () => submitHostname(value)
         );
         return;
@@ -417,13 +446,14 @@ const CustomDomainDialog = ({
       return <div className="h-24 rounded-md bg-muted/50 animate-pulse" />;
     }
 
-    // No paid plan -> upsell immediately (before any setup).
-    if (!hasPaidPlan) {
-      return <UpsellBody onViewPlans={onViewPlans} />;
-    }
-
+    // Hold the skeleton until tls_mode is known so the upsell never flashes.
     if (isLoading) {
       return <div className="h-24 rounded-md bg-muted/50 animate-pulse" />;
+    }
+
+    // No paid plan -> upsell (manual deployments are exempt).
+    if (!hasPaidPlan && !manualMode) {
+      return <UpsellBody onViewPlans={onViewPlans} />;
     }
 
     // 404 is handled by the trigger (hidden); treat any load error gracefully.
@@ -436,6 +466,20 @@ const CustomDomainDialog = ({
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Retry
           </Button>
+        </div>
+      );
+    }
+
+    // Misconfigured manual deployment — nothing to add; existing rows carry
+    // their own setup_records values and stay manageable.
+    if (manualMode && ingressHost == null && !data) {
+      return (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <AlertCircle className="mt-0.5 h-4 w-4 text-destructive shrink-0" />
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            This deployment isn&apos;t configured for custom domains — contact
+            your administrator.
+          </p>
         </div>
       );
     }
@@ -504,7 +548,7 @@ const CustomDomainDialog = ({
     }
 
     // ===== Failed-like (status failed, or SSL didn't issue) =====
-    if (data && failedLike) {
+    if (data && failedLike && !manualMode) {
       return (
         <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
           <div className="flex items-center justify-between">
@@ -536,6 +580,25 @@ const CustomDomainDialog = ({
     // The hostname lives in the dialog title (with the amber chip, same
     // language as the page card), so the body starts straight with the
     // checklist — flat on the dialog background, like the migration wizard.
+    if (data && manualMode && (inDnsSetup || failedLike)) {
+      return (
+        <div className="flex flex-col gap-5">
+          <DnsSetupChecklist domain={data} manualMode />
+
+          <ManualVerifyPanel
+            errors={data.verification_errors}
+            notice={verifyNotice}
+            onVerify={handleVerify}
+            verifyPending={verifyMutation.isPending}
+          />
+
+          <div className="flex justify-end">
+            <RemoveButton onConfirm={handleRemove} />
+          </div>
+        </div>
+      );
+    }
+
     if (data && inDnsSetup) {
       return (
         <div className="flex flex-col gap-5">
@@ -550,7 +613,9 @@ const CustomDomainDialog = ({
               <div className="rounded-lg border border-sidebar-border bg-background overflow-hidden">
                 <DnsRow label="Type" value="CNAME" />
                 <DnsRow label="Host" value={data.hostname} copyable />
-                <DnsRow label="Value" value={data.cname_target} copyable />
+                {data.cname_target && (
+                  <DnsRow label="Value" value={data.cname_target} copyable />
+                )}
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Names vary by provider — your DNS UI may call{" "}
@@ -639,10 +704,10 @@ const CustomDomainDialog = ({
       return {
         title: "Use your own subdomain",
         description:
-          "Your links will resolve on your own subdomain instead of the grovs one. SSL is included.",
+          "Your links will resolve on your own subdomain instead of the grovs one.",
       };
     }
-    if (!hasPaidPlan) {
+    if (!hasPaidPlan && !manualMode) {
       return {
         title: "Use your own subdomain",
         description:
@@ -671,8 +736,9 @@ const CustomDomainDialog = ({
     if (failedLike) {
       return {
         title: "Subdomain verification failed",
-        description:
-          "We couldn't verify the DNS record. Check it and try again.",
+        description: manualMode
+          ? "Fix the issue below, then verify again."
+          : "We couldn't verify the DNS record. Check it and try again.",
       };
     }
     if (inDnsSetup) {
@@ -684,12 +750,13 @@ const CustomDomainDialog = ({
             <span className="truncate">{data?.hostname}</span>
             <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400 shrink-0">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Verifying
+              {manualMode ? "Pending" : "Verifying"}
             </span>
           </span>
         ),
-        description:
-          "Add these records at your DNS provider. We check for them automatically.",
+        description: manualMode
+          ? "Complete these steps in order at your provider."
+          : "Add these records at your DNS provider. We check for them automatically.",
       };
     }
     if (data?.status === "active") {
@@ -700,8 +767,9 @@ const CustomDomainDialog = ({
     }
     return {
       title: "Use your own subdomain",
-      description:
-        "Your links will resolve on your own subdomain instead of the grovs one. SSL is included.",
+      description: manualMode
+        ? "Your links will resolve on your own subdomain instead of the grovs one."
+        : "Your links will resolve on your own subdomain instead of the grovs one. SSL is included.",
     };
   })();
 

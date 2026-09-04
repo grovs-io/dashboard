@@ -28,6 +28,20 @@ export const registerSchema = z
 
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 
+export const acceptInviteSchema = z
+  .object({
+    name: nameSchema,
+    // RegisterForm keeps the hidden field in its shared form shape. Invitation
+    // acceptance gets the email from the invitation token, so it must stay blank.
+    email: z.string().max(0),
+    password: passwordSchema,
+    password_confirm: z.string(),
+  })
+  .refine((data) => data.password === data.password_confirm, {
+    message: "Passwords do not match",
+    path: ["password_confirm"],
+  });
+
 export const resetPasswordSchema = z.object({
   email: emailSchema,
 });

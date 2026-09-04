@@ -10,6 +10,7 @@ import {
   CUSTOM_DOMAIN_PREFLIGHT_POLL_MS,
   isCustomDomainInFlight,
   isLegacyCustomDomainPayload,
+  isManualCustomDomainMode,
   preflightCnameVerdict,
 } from "@/lib/customDomainStatus";
 import { ApiError } from "@/lib/ApiError";
@@ -17,12 +18,13 @@ import { queryKeys } from "@/lib/queryKeys";
 import { showErrorNotification } from "@/lib/Notifications";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import {
-  useCustomDomainsQuery,
+  useCustomDomainsEnvelopeQuery,
   useCustomDomainPreflightQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
 import { useInstanceDetailsQuery } from "@/hooks/queries/useInstanceQueries";
 import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMutations";
+import { Skeleton } from "@/components/ui/skeleton";
 import ScaleUpDialog from "@/components/settings/ScaleUpDialog";
 import CustomDomainDialog from "./CustomDomainDialog";
 
@@ -49,10 +51,13 @@ const CustomDomainSetup = ({
     selectedInstance?.id
   );
 
-  const { data, isError, error } = useCustomDomainsQuery(projectId);
+  const { data, isLoading, isError, error } =
+    useCustomDomainsEnvelopeQuery(projectId);
+  const manualMode = isManualCustomDomainMode(data?.tls_mode);
   // The card is scoped to the primary domain; migration rows belong to the
   // separate Migration Source card and must be filtered out here.
-  const primary = (data ?? []).find((d) => d.purpose === "primary") ?? null;
+  const primary =
+    (data?.custom_domains ?? []).find((d) => d.purpose === "primary") ?? null;
   // Cloudflare can mark the hostname "active" from the TXT challenges alone,
   // before the customer points the CNAME. The dialog keeps showing setup in
   // that case, so the card must not claim the domain is live either. Shares
@@ -63,14 +68,18 @@ const CustomDomainSetup = ({
     primary?.hostname,
     {
       enabled:
-        primary?.status === "active" && !isLegacyCustomDomainPayload(primary),
+        primary?.status === "active" &&
+        !manualMode &&
+        !isLegacyCustomDomainPayload(primary, data?.tls_mode),
       refetchInterval: (query) =>
         preflightCnameVerdict(query.state.data) === "matched"
           ? false
           : CUSTOM_DOMAIN_PREFLIGHT_POLL_MS,
     }
   );
+  // Manual mode: "active" is authoritative, preflight is never consulted.
   const activeAwaitingCname =
+    !manualMode &&
     primary?.status === "active" &&
     preflightCnameVerdict(preflightQuery.data) === "not_pointed";
   const [open, setOpen] = useState(false);
@@ -115,6 +124,15 @@ const CustomDomainSetup = ({
   // 404 -> feature unavailable on this deployment -> hide the trigger entirely.
   if (isError && getApiErrorStatus(error) === 404) {
     return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    );
   }
 
   const renderTrigger = () => {

@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DialogTitle } from "@radix-ui/react-dialog";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Save, Trash2, Workflow, X } from "lucide-react";
+import { Link2, Plus, Save, Trash2, Workflow, X } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const RedirectPreviewModal = dynamic(
@@ -149,6 +149,8 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
       desktopRedirectType: form.desktopRedirectType,
       showPreviewAndroid: form.showPreviewAndroid,
       showPreviewIOS: form.showPreviewIOS,
+      copyToClipboardAndroid: form.copyToClipboardAndroid,
+      copyToClipboardIOS: form.copyToClipboardIOS,
     },
     projectRedirectsConfig ?? null
   );
@@ -173,6 +175,8 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
     desktopRedirectType: form.desktopRedirectType,
     showPreviewIOS: form.showPreviewIOS,
     showPreviewAndroid: form.showPreviewAndroid,
+    copyToClipboardIOS: form.copyToClipboardIOS,
+    copyToClipboardAndroid: form.copyToClipboardAndroid,
     utmCampaign: form.utmCampaign,
     utmMedium: form.utmMedium,
     utmSource: form.utmSource,
@@ -200,6 +204,11 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
   const openEditLinkDialog = useCallback(
     async (link: Pick<Link, "id">, opts: DialogOptions) => {
       form.handleCloseWindow();
+      setShowDiscardConfirm(false);
+      setCreatedLink(null);
+      setIsLinkGenerated(false);
+      setSelectedLink(null);
+      setInitialKeyPair([]);
       setOptions(opts);
       setIsLoadingEdit(true);
       try {
@@ -465,8 +474,11 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
           ) : (
             <>
               <DialogHeader>
-                <div className="flex items-center gap-4 p-4 w-full">
-                  <DialogTitle className="font-semibold text-md">
+                <div className="flex items-center gap-3 px-5 py-3.5 w-full">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-primary">
+                    <Link2 className="h-4 w-4" />
+                  </span>
+                  <DialogTitle className="text-[15px] font-semibold">
                     {mode === "create"
                       ? "Create Link"
                       : selectedLink?.active
@@ -474,11 +486,11 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
                         : "Archived Link"}
                   </DialogTitle>
                   <button
-                    className="ml-auto"
+                    className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     onClick={handleClose}
                     aria-label="Close dialog"
                   >
-                    <X />
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               </DialogHeader>
@@ -507,6 +519,7 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
                 showErrors={showErrors}
                 form={form}
                 domain={domain}
+                projectRedirectsConfig={projectRedirectsConfig ?? null}
               />
             )}
           </div>

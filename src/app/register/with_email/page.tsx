@@ -3,7 +3,8 @@ import { useUserContext } from "@/context/useUserContext";
 import { useState } from "react";
 
 import { RegisterForm } from "@/components/registerForm/RegisterForm";
-import { showGenericError } from "@/lib/Notifications";
+import { showErrorNotification } from "@/lib/Notifications";
+import { getApiErrorInfo } from "@/lib/ApiError";
 import { useRouter, redirect } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,8 +39,27 @@ const Page = () => {
     try {
       await createUser(data.email, data.password, data.name);
       router.replace("/");
-    } catch {
-      showGenericError();
+    } catch (error) {
+      const { message, fieldErrors } = getApiErrorInfo(
+        error,
+        "We couldn't create your account. Please try again."
+      );
+
+      // Map any field-specific backend errors (e.g. "Email has already been
+      // taken") onto the matching input so they show inline next to the field.
+      let mappedToField = false;
+      (["email", "password", "name"] as const).forEach((field) => {
+        if (fieldErrors[field]) {
+          form.setError(field, { type: "server", message: fieldErrors[field] });
+          mappedToField = true;
+        }
+      });
+
+      // Only toast when we couldn't attach the error to a specific field, to
+      // avoid duplicating the same message inline and in a toast.
+      if (!mappedToField) {
+        showErrorNotification(message);
+      }
     }
   };
 

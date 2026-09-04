@@ -7,6 +7,7 @@ import {
   AppWindow,
   Store,
   QrCode,
+  ClipboardCopy,
 } from "lucide-react";
 import Image from "next/image";
 import androidIcon from "@/assets/icons/generic/Android.svg";
@@ -23,10 +24,12 @@ interface RedirectFlowPanelProps {
   androidStore: boolean;
   androidCustomUrl: string;
   androidShowPreview: boolean;
+  androidCopyToClipboard: boolean;
   iosApp: boolean;
   iosStore: boolean;
   iosCustomUrl: string;
   iosShowPreview: boolean;
+  iosCopyToClipboard: boolean;
   desktopGeneratedPage: boolean;
   desktopCustomUrl: string;
   defaultUrl: string;
@@ -108,30 +111,42 @@ function Fork({
 
 /* ─── Platform flows ─── */
 
+function PreviewNode({ copyToClipboard }: { copyToClipboard?: boolean }) {
+  return (
+    <>
+      <Node>
+        <div className="flex items-center gap-1.5">
+          <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
+          Preview page
+          {copyToClipboard && (
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <ClipboardCopy className="h-3 w-3 shrink-0" />
+              copies link
+            </span>
+          )}
+        </div>
+      </Node>
+      <HArrow />
+    </>
+  );
+}
+
 function AppFlow({
   showPreview,
+  copyToClipboard,
   storeName,
   store,
   customUrl,
 }: {
   showPreview: boolean;
+  copyToClipboard?: boolean;
   storeName: string;
   store: boolean;
   customUrl: string;
 }) {
   return (
     <div className="flex items-center">
-      {showPreview && (
-        <>
-          <Node>
-            <div className="flex items-center gap-1.5">
-              <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
-              Preview page
-            </div>
-          </Node>
-          <HArrow />
-        </>
-      )}
+      {showPreview && <PreviewNode copyToClipboard={copyToClipboard} />}
       <Node>
         <div className="flex items-center gap-1.5">
           <AppWindow className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -174,24 +189,16 @@ function AppFlow({
 function WebFlow({
   customUrl,
   showPreview,
+  copyToClipboard,
 }: {
   customUrl: string;
   showPreview?: boolean;
+  copyToClipboard?: boolean;
 }) {
   if (customUrl) {
     return (
       <div className="flex items-center">
-        {showPreview && (
-          <>
-            <Node>
-              <div className="flex items-center gap-1.5">
-                <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
-                Preview page
-              </div>
-            </Node>
-            <HArrow />
-          </>
-        )}
+        {showPreview && <PreviewNode copyToClipboard={copyToClipboard} />}
         <Node>
           <div className="flex items-center gap-1.5">
             <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -297,10 +304,12 @@ const RedirectFlowPanel = ({
   androidStore,
   androidCustomUrl,
   androidShowPreview,
+  androidCopyToClipboard,
   iosApp,
   iosStore,
   iosCustomUrl,
   iosShowPreview,
+  iosCopyToClipboard,
   desktopGeneratedPage,
   desktopCustomUrl,
 }: RedirectFlowPanelProps) => {
@@ -346,6 +355,7 @@ const RedirectFlowPanel = ({
               {androidApp ? (
                 <AppFlow
                   showPreview={androidShowPreview}
+                  copyToClipboard={androidCopyToClipboard}
                   storeName="Play Store"
                   store={androidStore}
                   customUrl={androidCustomUrl}
@@ -354,6 +364,7 @@ const RedirectFlowPanel = ({
                 <WebFlow
                   customUrl={androidCustomUrl}
                   showPreview={androidShowPreview}
+                  copyToClipboard={androidCopyToClipboard}
                 />
               )}
             </PlatformGroup>
@@ -378,6 +389,7 @@ const RedirectFlowPanel = ({
               {iosApp ? (
                 <AppFlow
                   showPreview={iosShowPreview}
+                  copyToClipboard={iosCopyToClipboard}
                   storeName="App Store"
                   store={iosStore}
                   customUrl={iosCustomUrl}
@@ -386,6 +398,7 @@ const RedirectFlowPanel = ({
                 <WebFlow
                   customUrl={iosCustomUrl}
                   showPreview={iosShowPreview}
+                  copyToClipboard={iosCopyToClipboard}
                 />
               )}
             </PlatformGroup>

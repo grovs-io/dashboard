@@ -1,5 +1,5 @@
-import PageSkeleton from "@/components/common/PageSkeleton";
+import { ContentSkeleton } from "@/components/common/PageSkeleton";
 
 export default function ProtectedLoading() {
-  return <PageSkeleton />;
+  return <ContentSkeleton />;
 }

@@ -32,6 +32,7 @@ function setup(
     domain: makeDomain(),
     onRecheck,
     recheckPending: false,
+    onVerify: vi.fn(),
     ...overrides,
   };
   const utils = render(<DnsVerifyStep {...props} />);

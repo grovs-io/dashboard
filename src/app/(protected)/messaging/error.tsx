@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { capturePosthog } from "@/analytics/posthog";
 import { categorizeError } from "@/lib/errorUtils";
+import { ErrorState } from "@/components/common/ErrorState";
 
 export default function MessagingError({
   error,
@@ -23,15 +23,5 @@ export default function MessagingError({
 
   const { title, description } = categorizeError(error);
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-      <h2 className="text-xl font-semibold text-destructive">{title}</h2>
-      <p className="my-3 text-sm text-muted-foreground max-w-md">
-        {description}
-      </p>
-      <Button onClick={() => reset()} size="sm">
-        Try Again
-      </Button>
-    </div>
-  );
+  return <ErrorState title={title} description={description} onRetry={reset} />;
 }

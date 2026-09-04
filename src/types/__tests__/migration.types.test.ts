@@ -29,6 +29,8 @@ describe("migration types", () => {
       id: 1,
       provider: "branch",
       old_host: "old.acme.com",
+      provider_hosted: false,
+      extra_hosts: [],
       enabled: true,
       health: "healthy",
       consecutive_failures: 0,

@@ -16,6 +16,9 @@ export interface RedirectConfig {
   show_preview_android: boolean;
   show_preview_ios: boolean;
   show_preview?: boolean;
+  // Absent on backends that predate clipboard matching.
+  copy_to_clipboard_android?: boolean;
+  copy_to_clipboard_ios?: boolean;
   ios?: RedirectPlatformConfig;
   android?: RedirectPlatformConfig;
   desktop?: RedirectPlatformConfig;
@@ -48,6 +51,18 @@ export type CustomDomainStatus =
 export type CustomDomainSource = "saas" | "enterprise";
 export type CustomDomainPurpose = "primary" | "migration";
 
+// Absent on backends that predate manual (self-hosted) TLS mode.
+export type CustomDomainTlsMode = "manual" | "cloudflare";
+
+// Ordered manual setup step; the backend's ordering is load-bearing (cert before DNS).
+export interface CustomDomainSetupRecord {
+  kind: "certificate" | "dns";
+  type: string | null;
+  name: string | null;
+  value: string | null;
+  note: string;
+}
+
 export interface CustomDomain {
   hostname: string;
   purpose: CustomDomainPurpose;
@@ -58,7 +73,9 @@ export interface CustomDomain {
   // at the render site.
   verification_errors: string[] | string | Record<string, unknown> | null;
   source: CustomDomainSource;
-  cname_target: string;
+  cname_target: string | null;
+  // Present only on manual-mode rows.
+  setup_records?: CustomDomainSetupRecord[];
   ssl_validation_txt_records?: Array<{
     name: string;
     value: string;
@@ -73,12 +90,18 @@ export interface CustomDomain {
   txt_record?: string | null;
 }
 
+// Deployment-level fields on every custom-domain envelope; absence reads as Cloudflare mode.
+export interface CustomDomainEnvelopeFields {
+  tls_mode?: CustomDomainTlsMode;
+  ingress_host?: string | null;
+}
+
 // Legacy singular envelope kept for the deprecated singular endpoint shim.
-export interface CustomDomainResponse {
+export interface CustomDomainResponse extends CustomDomainEnvelopeFields {
   custom_domain: CustomDomain | null;
 }
 
-export interface CustomDomainsListResponse {
+export interface CustomDomainsListResponse extends CustomDomainEnvelopeFields {
   custom_domains: CustomDomain[];
 }
 

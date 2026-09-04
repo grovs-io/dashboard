@@ -11,6 +11,7 @@ import {
   useVerifySubdomainMutation,
   useAddCustomDomainMutation,
   useRemoveCustomDomainMutation,
+  useVerifyCustomDomainMutation,
 } from "../mutations/useConfigurationMutations";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -25,6 +26,7 @@ vi.mock("@/api/configurations/domains/configDomainsService", () => ({
   verifySubdomainAvailabilityAPICall: vi.fn(),
   addCustomDomainWithPurposeAPICall: vi.fn(),
   removeCustomDomainByPurposeAPICall: vi.fn(),
+  verifyCustomDomainAPICall: vi.fn(),
 }));
 
 vi.mock("@/analytics", () => ({
@@ -45,6 +47,7 @@ import {
   verifySubdomainAvailabilityAPICall,
   addCustomDomainWithPurposeAPICall,
   removeCustomDomainByPurposeAPICall,
+  verifyCustomDomainAPICall,
 } from "@/api/configurations/domains/configDomainsService";
 import type { GoogleTrackingIdPayload } from "@/types";
 
@@ -91,12 +94,16 @@ describe("useConfigurationMutations", () => {
           defaultFallback: "https://example.com",
           showAndroidPreview: true,
           showIosPreview: false,
+          copyToClipboardAndroid: true,
+          copyToClipboardIos: false,
         });
       });
 
       expect(mockedSetDefaultRedirect).toHaveBeenCalledWith(
         "proj-1",
         "https://example.com",
+        true,
+        false,
         true,
         false
       );
@@ -116,6 +123,8 @@ describe("useConfigurationMutations", () => {
           defaultFallback: "https://example.com",
           showAndroidPreview: false,
           showIosPreview: false,
+          copyToClipboardAndroid: false,
+          copyToClipboardIos: false,
         });
       });
 
@@ -461,6 +470,182 @@ describe("useConfigurationMutations", () => {
 
       expect(mockedRemoveCustomDomain).not.toHaveBeenCalled();
       expect(invalidateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("useVerifyCustomDomainMutation", () => {
+    const mockedVerifyCustomDomain = vi.mocked(verifyCustomDomainAPICall);
+
+    // The shared client's gcTime: 0 would GC the observer-less cache entries.
+    beforeEach(() => {
+      queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+          mutations: { retry: false },
+        },
+      });
+    });
+
+    const verifiedPrimaryEnvelope = {
+      custom_domain: {
+        hostname: "links.acme.com",
+        purpose: "primary",
+        status: "active",
+        ssl_status: null,
+        verification_errors: null,
+        source: "enterprise",
+        cname_target: "links.app.com",
+      },
+      tls_mode: "manual",
+      ingress_host: "links.app.com",
+    };
+
+    it("calls verifyCustomDomainAPICall with projectId and hostname", async () => {
+      mockedVerifyCustomDomain.mockResolvedValueOnce({
+        data: verifiedPrimaryEnvelope,
+      } as never);
+
+      const { result } = renderHook(
+        () => useVerifyCustomDomainMutation("proj-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync("links.acme.com");
+      });
+
+      expect(mockedVerifyCustomDomain).toHaveBeenCalledWith(
+        "proj-1",
+        "links.acme.com"
+      );
+    });
+
+    it("writes the post-probe row into the plural list cache in place", async () => {
+      queryClient.setQueryData(queryKeys.projects.customDomains("proj-1"), {
+        custom_domains: [
+          { ...verifiedPrimaryEnvelope.custom_domain, status: "pending" },
+          { hostname: "old.acme.com", purpose: "migration", status: "pending" },
+        ],
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      });
+      mockedVerifyCustomDomain.mockResolvedValueOnce({
+        data: verifiedPrimaryEnvelope,
+      } as never);
+
+      const { result } = renderHook(
+        () => useVerifyCustomDomainMutation("proj-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync("links.acme.com");
+      });
+
+      const list = queryClient.getQueryData(
+        queryKeys.projects.customDomains("proj-1")
+      ) as { custom_domains: Array<{ hostname: string; status: string }> };
+      expect(
+        list.custom_domains.find((d) => d.hostname === "links.acme.com")?.status
+      ).toBe("active");
+      expect(
+        list.custom_domains.find((d) => d.hostname === "old.acme.com")?.status
+      ).toBe("pending");
+    });
+
+    it("updates the singular cache for a primary row", async () => {
+      mockedVerifyCustomDomain.mockResolvedValueOnce({
+        data: verifiedPrimaryEnvelope,
+      } as never);
+
+      const { result } = renderHook(
+        () => useVerifyCustomDomainMutation("proj-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync("links.acme.com");
+      });
+
+      expect(
+        queryClient.getQueryData(queryKeys.projects.customDomain("proj-1"))
+      ).toEqual(verifiedPrimaryEnvelope);
+    });
+
+    it("preserves cached tls_mode and ingress_host when the response omits them", async () => {
+      queryClient.setQueryData(queryKeys.projects.customDomains("proj-1"), {
+        custom_domains: [
+          { ...verifiedPrimaryEnvelope.custom_domain, status: "pending" },
+        ],
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      });
+      queryClient.setQueryData(queryKeys.projects.customDomain("proj-1"), {
+        custom_domain: {
+          ...verifiedPrimaryEnvelope.custom_domain,
+          status: "pending",
+        },
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      });
+      mockedVerifyCustomDomain.mockResolvedValueOnce({
+        data: { custom_domain: verifiedPrimaryEnvelope.custom_domain },
+      } as never);
+
+      const { result } = renderHook(
+        () => useVerifyCustomDomainMutation("proj-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync("links.acme.com");
+      });
+
+      const list = queryClient.getQueryData(
+        queryKeys.projects.customDomains("proj-1")
+      ) as { tls_mode?: string; ingress_host?: string | null };
+      expect(list.tls_mode).toBe("manual");
+      expect(list.ingress_host).toBe("links.app.com");
+      const singular = queryClient.getQueryData(
+        queryKeys.projects.customDomain("proj-1")
+      ) as { tls_mode?: string; custom_domain: { status: string } };
+      expect(singular.tls_mode).toBe("manual");
+      expect(singular.custom_domain.status).toBe("active");
+    });
+
+    it("leaves the singular (primary) cache alone for a migration row", async () => {
+      const primaryEnvelope = {
+        custom_domain: verifiedPrimaryEnvelope.custom_domain,
+        tls_mode: "manual",
+        ingress_host: "links.app.com",
+      };
+      queryClient.setQueryData(
+        queryKeys.projects.customDomain("proj-1"),
+        primaryEnvelope
+      );
+      mockedVerifyCustomDomain.mockResolvedValueOnce({
+        data: {
+          ...verifiedPrimaryEnvelope,
+          custom_domain: {
+            ...verifiedPrimaryEnvelope.custom_domain,
+            hostname: "old.acme.com",
+            purpose: "migration",
+          },
+        },
+      } as never);
+
+      const { result } = renderHook(
+        () => useVerifyCustomDomainMutation("proj-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync("old.acme.com");
+      });
+
+      expect(
+        queryClient.getQueryData(queryKeys.projects.customDomain("proj-1"))
+      ).toEqual(primaryEnvelope);
     });
   });
 });

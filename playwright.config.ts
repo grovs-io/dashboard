@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Dedicated port so e2e never collides with a dev server on 3001.
+const E2E_PORT = process.env.E2E_PORT ?? "5012";
+const E2E_URL = `http://localhost:${E2E_PORT}`;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -10,7 +14,7 @@ export default defineConfig({
   timeout: 30_000,
 
   use: {
-    baseURL: "http://localhost:3001",
+    baseURL: E2E_URL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "on-first-retry",
@@ -38,8 +42,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3001",
+    command: `PORT=${E2E_PORT} npm run dev`,
+    url: E2E_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

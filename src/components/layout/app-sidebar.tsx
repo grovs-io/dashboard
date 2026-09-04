@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   ChartNoAxesCombined,
+  Activity,
   Link2,
   Users,
   DollarSign,
@@ -10,6 +11,7 @@ import {
   Settings2,
   PencilRuler,
   SquareTerminal,
+  ScrollText,
 } from "lucide-react";
 
 import { NavMain } from "@/components/layout/nav-main";
@@ -22,9 +24,13 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { NavSupport } from "@/components/layout/nav-support";
 import { IS_ENTERPRISE } from "@/lib/edition";
+import { useProjectSelection } from "@/context/useProjectSelection";
+import { useAuditLogAccess } from "@/hooks/queries/useAuditQueries";
+import type { navItemType } from "@/components/layout/nav-main";
 
 const data = {
   navMain: [
@@ -32,6 +38,12 @@ const data = {
       title: "Dashboard",
       url: "/dashboard",
       icon: ChartNoAxesCombined,
+      itemType: "simple",
+    },
+    {
+      title: "Events",
+      url: "/analytics/event_log",
+      icon: Activity,
       itemType: "simple",
     },
     {
@@ -73,7 +85,6 @@ const data = {
             url: "/revenue",
             icon: DollarSign,
             itemType: "simple",
-            badge: "Beta",
           },
         ]
       : []),
@@ -144,6 +155,27 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { selectedInstance } = useProjectSelection();
+  const { allowed: auditAllowed } = useAuditLogAccess(selectedInstance?.id);
+
+  // Audit Logs sits alongside Settings in the Configuration group, and only
+  // for admins on an entitled instance.
+  const configItems: navItemType[] = React.useMemo(
+    () =>
+      auditAllowed
+        ? [
+            ...data.projects,
+            {
+              title: "Audit Logs",
+              url: "/audit_logs",
+              icon: ScrollText,
+              itemType: "simple",
+            },
+          ]
+        : data.projects,
+    [auditAllowed]
+  );
+
   return (
     <Sidebar collapsible="icon" aria-label="Main navigation" {...props}>
       <SidebarHeader className="h-[calc(4rem+1px)] border-b border-sidebar-border justify-center">
@@ -151,10 +183,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects items={data.projects} />
-        <NavSupport />
+        <NavProjects items={configItems} />
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border">
+      <SidebarFooter className="border-t border-sidebar-border gap-0">
+        <NavSupport />
+        <SidebarSeparator className="mx-0 my-1" />
         <NavUser />
       </SidebarFooter>
       <SidebarRail />

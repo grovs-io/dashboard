@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useUserContext } from "@/context/useUserContext";
 import PageSkeleton from "@/components/common/PageSkeleton";
 
@@ -13,24 +13,30 @@ export default function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { fetchCurrentUser, userRef } = useUserContext();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
+  const hasRunRef = useRef(false);
 
-  // Extract tokens from URL (if present), then check authentication
+  // Runs once per mount — depending on the query string re-requested /users/me on every filter change.
   useEffect(() => {
-    const token = searchParams.get("token");
-    const refreshToken = searchParams.get("refresh_token");
+    if (hasRunRef.current) return;
+    hasRunRef.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const refreshToken = params.get("refresh_token");
 
     if (token && refreshToken) {
       LocalStorage.setAuthenticationToken(token);
       LocalStorage.setRefreshToken(refreshToken);
 
-      // Remove tokens from URL to prevent leaking via history/referer
+      // Remove tokens from URL immediately to prevent leaking via history/referer.
+      // history.replaceState is synchronous (no navigation/re-render round-trip),
+      // so the token never sits in a readable URL while async auth runs below.
       const url = new URL(window.location.href);
       url.searchParams.delete("token");
       url.searchParams.delete("refresh_token");
-      router.replace(url.pathname + url.search, { scroll: false });
+      window.history.replaceState(null, "", url.pathname + url.search);
     }
 
     const authToken = LocalStorage.getAuthenticationToken();
@@ -52,7 +58,7 @@ export default function ProtectedRoute({
       }
     };
     checkAuth();
-  }, [router, searchParams, fetchCurrentUser]);
+  }, [router, fetchCurrentUser]);
 
   // Don't render children until auth is verified
   if (!hasCheckedAuth || !userRef.current) {

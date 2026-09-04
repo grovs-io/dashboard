@@ -38,6 +38,8 @@ export const createLinkSchema = z.object({
   desktopRedirectType: z.string(),
   showPreviewAndroid: z.boolean().nullable(),
   showPreviewIOS: z.boolean().nullable(),
+  copyToClipboardAndroid: z.boolean().nullable(),
+  copyToClipboardIOS: z.boolean().nullable(),
 
   // Tracking
   utmCampaign: z.string(),

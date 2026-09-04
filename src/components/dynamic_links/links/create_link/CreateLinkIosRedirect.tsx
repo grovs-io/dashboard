@@ -32,6 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import ClipboardToggle from "@/components/common/clipboard-toggle";
 import type { LucideIcon } from "lucide-react";
 
 type OptionItem = {
@@ -169,6 +170,10 @@ const CreateLinkIosRedirect = React.memo(function CreateLinkIosRedirect({
   iosLinkBehaviour,
   setIosLinkBehaviour,
   setShowPreviewIOS,
+  copyToClipboardIOS,
+  setCopyToClipboardIOS,
+  projectShowPreviewIOS,
+  projectCopyToClipboardIOS,
   disabledActions,
   showErrors,
 }: {
@@ -179,10 +184,20 @@ const CreateLinkIosRedirect = React.memo(function CreateLinkIosRedirect({
   setIosRedirectType: (value: string) => void;
   setIosLinkBehaviour: (value: string) => void;
   setShowPreviewIOS: (value: boolean | null) => void;
+  copyToClipboardIOS: boolean | null;
+  setCopyToClipboardIOS: (value: boolean | null) => void;
+  projectShowPreviewIOS: boolean;
+  projectCopyToClipboardIOS: boolean;
   disabledActions?: boolean;
   showErrors?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
+  // "Default" inherits the project preview setting; the copy toggle rides on it.
+  const previewEnabled =
+    iosLinkBehaviour === DEFAULT
+      ? projectShowPreviewIOS
+      : iosLinkBehaviour === SHOW_PREVIEWS;
+  const copyEnabled = copyToClipboardIOS ?? projectCopyToClipboardIOS;
   const url = iosRedirectURL?.url ?? "";
   const urlIsValid = httpUrlSchema.safeParse(url).success;
   const isHttps = url.startsWith("https://");
@@ -217,7 +232,18 @@ const CreateLinkIosRedirect = React.memo(function CreateLinkIosRedirect({
       <OptionDropdown
         options={REDIRECT_OPTIONS}
         value={iosRedirectType}
-        onChange={(value) => !disabledActions && setIosRedirectType(value)}
+        onChange={(value) => {
+          if (disabledActions) return;
+          setIosRedirectType(value);
+          // Back to Default hides the preview and clipboard controls, so drop
+          // their overrides too — the link inherits the project's rules, exactly
+          // like a newly created one.
+          if (value === DEFAULT) {
+            setIosLinkBehaviour(DEFAULT);
+            setShowPreviewIOS(null);
+            setCopyToClipboardIOS(null);
+          }
+        }}
         disabled={disabledActions}
       />
 
@@ -311,6 +337,17 @@ const CreateLinkIosRedirect = React.memo(function CreateLinkIosRedirect({
               disabled={disabledActions}
             />
           </div>
+
+          {previewEnabled && (
+            <ClipboardToggle
+              id="link-ios-copy-to-clipboard"
+              checked={copyEnabled}
+              onCheckedChange={(checked) =>
+                !disabledActions && setCopyToClipboardIOS(checked)
+              }
+              disabled={disabledActions}
+            />
+          )}
         </>
       )}
     </div>

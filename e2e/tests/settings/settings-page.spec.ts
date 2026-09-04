@@ -6,7 +6,7 @@ test.describe("Settings Page", () => {
   }) => {
     await page.goto("/settings");
 
-    await expect(page.getByText(/active users/i)).toBeVisible({
+    await expect(page.getByText(/active users/i).first()).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -34,7 +34,7 @@ test.describe("Settings Page", () => {
   test("export button is functional", async ({ authenticatedPage: page }) => {
     await page.goto("/settings");
 
-    const exportButton = page.getByRole("button", { name: /export/i });
+    const exportButton = page.getByRole("button", { name: /export/i }).first();
     await expect(exportButton).toBeVisible({ timeout: 10_000 });
   });
 });

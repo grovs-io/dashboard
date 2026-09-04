@@ -23,6 +23,8 @@ const AudienceItemDetailsAnalytics = ({
   metrics: VisitorDetailMetrics | null;
   agregatedMetrics: AggregatedVisitorMetrics | null;
 }) => {
+  // Backend zero-fills metrics (never null) for visitors with no lifecycle
+  // activity, so the grid below renders truthful zeros. Defensive guard only.
   if (!metrics) return null;
 
   return (
@@ -222,7 +224,7 @@ const MetricCell = ({
   span,
 }: {
   label: string;
-  value: string | number | undefined;
+  value: string | number | null | undefined;
   span?: number;
 }) => (
   <div

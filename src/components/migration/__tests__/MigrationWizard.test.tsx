@@ -19,7 +19,12 @@ import type { CustomDomain, MigrationSource } from "@/types";
 
 vi.mock("@/hooks/queries/useConfigurationQueries", () => ({
   useCustomDomainPreflightQuery: vi.fn(),
-  useCustomDomainsQuery: vi.fn(),
+  useCustomDomainsEnvelopeQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/edition", () => ({
+  IS_ENTERPRISE: false,
+  IS_SELF_HOSTED: true,
 }));
 
 vi.mock("@/hooks/queries/useMigrationQueries", () => ({
@@ -28,12 +33,14 @@ vi.mock("@/hooks/queries/useMigrationQueries", () => ({
 
 vi.mock("@/hooks/mutations/useConfigurationMutations", () => ({
   useRemoveCustomDomainMutation: vi.fn(),
+  useVerifyCustomDomainMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/mutations/useMigrationMutations", () => ({
   useCreateMigrationMutation: vi.fn(),
   useDeleteMigrationSourceMutation: vi.fn(),
   useTestMigrationSourceMutation: vi.fn(),
+  useUpdateMigrationSourceMutation: vi.fn(),
 }));
 
 vi.mock("@/lib/Notifications", () => ({
@@ -44,24 +51,30 @@ vi.mock("@/lib/copyTextHelper", () => ({ handleCopyText: vi.fn() }));
 
 import {
   useCustomDomainPreflightQuery,
-  useCustomDomainsQuery,
+  useCustomDomainsEnvelopeQuery,
 } from "@/hooks/queries/useConfigurationQueries";
 import { useMigrationSourceQuery } from "@/hooks/queries/useMigrationQueries";
-import { useRemoveCustomDomainMutation } from "@/hooks/mutations/useConfigurationMutations";
+import {
+  useRemoveCustomDomainMutation,
+  useVerifyCustomDomainMutation,
+} from "@/hooks/mutations/useConfigurationMutations";
 import {
   useCreateMigrationMutation,
   useDeleteMigrationSourceMutation,
   useTestMigrationSourceMutation,
+  useUpdateMigrationSourceMutation,
 } from "@/hooks/mutations/useMigrationMutations";
 import MigrationWizard from "../MigrationWizard";
 
-const mockedDomains = vi.mocked(useCustomDomainsQuery);
+const mockedDomains = vi.mocked(useCustomDomainsEnvelopeQuery);
 const mockedPreflight = vi.mocked(useCustomDomainPreflightQuery);
 const mockedSource = vi.mocked(useMigrationSourceQuery);
 const mockedRemoveDomain = vi.mocked(useRemoveCustomDomainMutation);
+const mockedVerifyDomain = vi.mocked(useVerifyCustomDomainMutation);
 const mockedCreateMigration = vi.mocked(useCreateMigrationMutation);
 const mockedDeleteSource = vi.mocked(useDeleteMigrationSourceMutation);
 const mockedTestSource = vi.mocked(useTestMigrationSourceMutation);
+const mockedUpdateSource = vi.mocked(useUpdateMigrationSourceMutation);
 
 const PROJECT_ID = "p1";
 
@@ -92,6 +105,8 @@ function buildSource(
     id: 1,
     provider: "branch",
     old_host: "old.acme.com",
+    provider_hosted: false,
+    extra_hosts: [],
     enabled: true,
     health: "healthy",
     consecutive_failures: 0,
@@ -115,9 +130,12 @@ interface SourceState {
   error?: unknown;
 }
 
-function setDomains(state: DomainsState = {}) {
+function setDomains(
+  state: DomainsState = {},
+  envelope: Record<string, unknown> = {}
+) {
   mockedDomains.mockReturnValue({
-    data: state.data ?? [],
+    data: { custom_domains: state.data ?? [], ...envelope },
     isLoading: state.isLoading ?? false,
     refetch: vi.fn(),
   } as never);
@@ -165,9 +183,11 @@ describe("MigrationWizard", () => {
     setSource();
     setPreflight();
     mockedRemoveDomain.mockReturnValue(stubMutation());
+    mockedVerifyDomain.mockReturnValue(stubMutation());
     mockedCreateMigration.mockReturnValue(stubMutation());
     mockedDeleteSource.mockReturnValue(stubMutation());
     mockedTestSource.mockReturnValue(stubMutation());
+    mockedUpdateSource.mockReturnValue(stubMutation());
   });
 
   it("renders the not_admin alert on 403 source error", () => {
@@ -207,6 +227,103 @@ describe("MigrationWizard", () => {
         hostname: "old.acme.com",
         credentials: { branch_key: "key_live_abc" },
       });
+    });
+  });
+
+  it("submits a provider-hosted create with extra hosts", async () => {
+    const createMutate = vi.fn().mockResolvedValue({ data: {} });
+    mockedCreateMigration.mockReturnValue(
+      stubMutation({ mutateAsync: createMutate })
+    );
+
+    render(<MigrationWizard projectId={PROJECT_ID} />);
+
+    chooseProvider(/branch/i);
+    fireEvent.click(screen.getByRole("radio", { name: /owns it/i }));
+    fireEvent.change(screen.getByLabelText("Branch key"), {
+      target: { value: "key_live_abc" },
+    });
+    fireEvent.change(screen.getByLabelText(/branch domain/i), {
+      target: { value: "xyz.app.link" },
+    });
+    const chips = screen.getByPlaceholderText(/xyz-alternate\.app\.link/i);
+    fireEvent.change(chips, { target: { value: "xyz-alternate.app.link" } });
+    fireEvent.keyDown(chips, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: /start migration/i }));
+
+    await waitFor(() => {
+      expect(createMutate).toHaveBeenCalledWith({
+        provider: "branch",
+        hostname: "xyz.app.link",
+        credentials: { branch_key: "key_live_abc" },
+        provider_hosted: true,
+        extra_hosts: ["xyz-alternate.app.link"],
+      });
+    });
+  });
+
+  it("renders the management view for a provider-hosted source with no domain row", () => {
+    setSource({
+      data: buildSource({ provider_hosted: true, extra_hosts: ["a.app.link"] }),
+    });
+    render(<MigrationWizard projectId={PROJECT_ID} />);
+    expect(screen.getByText(/migrating from branch/i)).toBeInTheDocument();
+    expect(screen.getByText("a.app.link")).toBeInTheDocument();
+  });
+
+  it("provider-hosted teardown deletes only the source", async () => {
+    const deleteMutate = vi.fn().mockResolvedValue({ data: {} });
+    const removeDomainMutate = vi.fn();
+    mockedDeleteSource.mockReturnValue(
+      stubMutation({ mutateAsync: deleteMutate })
+    );
+    mockedRemoveDomain.mockReturnValue(
+      stubMutation({ mutateAsync: removeDomainMutate })
+    );
+    setSource({ data: buildSource({ provider_hosted: true }) });
+
+    render(<MigrationWizard projectId={PROJECT_ID} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /remove migration/i }));
+    fireEvent.change(screen.getByLabelText(/type/i), {
+      target: { value: "old.acme.com" },
+    });
+    // Trigger and dialog action share the same accessible name — take the
+    // dialog's (last rendered).
+    const removeButtons = screen.getAllByRole("button", {
+      name: /remove migration/i,
+    });
+    fireEvent.click(removeButtons[removeButtons.length - 1]!);
+
+    await waitFor(() => expect(deleteMutate).toHaveBeenCalled());
+    expect(removeDomainMutate).not.toHaveBeenCalled();
+  });
+
+  it("surfaces extra-hosts 422s on the chips field", async () => {
+    const createMutate = vi.fn().mockRejectedValue(
+      new ApiError("unprocessable", 422, undefined, {
+        error:
+          "Extra hosts already in use by another migration source: a.app.link",
+      })
+    );
+    mockedCreateMigration.mockReturnValue(
+      stubMutation({ mutateAsync: createMutate })
+    );
+
+    render(<MigrationWizard projectId={PROJECT_ID} />);
+
+    chooseProvider(/branch/i);
+    fireEvent.click(screen.getByRole("radio", { name: /owns it/i }));
+    fireEvent.change(screen.getByLabelText("Branch key"), {
+      target: { value: "key_live_abc" },
+    });
+    fireEvent.change(screen.getByLabelText(/branch domain/i), {
+      target: { value: "xyz.app.link" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /start migration/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/already in use/i)).toBeInTheDocument();
     });
   });
 
@@ -292,6 +409,135 @@ describe("MigrationWizard", () => {
     expect(
       screen.queryByRole("button", { name: /^test$/i })
     ).not.toBeInTheDocument();
+  });
+
+  describe("manual mode", () => {
+    const manualEnvelope = {
+      tls_mode: "manual",
+      ingress_host: "links.app.com",
+    };
+    const manualRow = () =>
+      buildDomain({
+        status: "pending",
+        ssl_status: null,
+        source: "enterprise",
+        cname_target: "links.app.com",
+        setup_records: [
+          {
+            kind: "certificate",
+            type: null,
+            name: null,
+            value: null,
+            note: "Issue a certificate covering old.acme.com.",
+          },
+          {
+            kind: "dns",
+            type: "CNAME",
+            name: "old.acme.com",
+            value: "links.app.com",
+            note: "Add this only after the certificate is attached.",
+          },
+        ],
+      });
+
+    it("renders the manual checklist with a Verify button while pending", () => {
+      setDomains({ data: [manualRow()] }, manualEnvelope);
+      setSource({ data: buildSource() });
+
+      render(<MigrationWizard projectId={PROJECT_ID} />);
+
+      expect(screen.getByText(/issue a certificate/i)).toBeInTheDocument();
+      expect(screen.queryByText("Hostname ownership verified")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: /verify now/i })
+      ).toBeInTheDocument();
+      expect(screen.getByText(/activates automatically/i)).toBeInTheDocument();
+    });
+
+    it("calls the verify mutation with the migration hostname", async () => {
+      const verifyMutate = vi.fn().mockResolvedValue({ data: {} });
+      mockedVerifyDomain.mockReturnValue(
+        stubMutation({ mutateAsync: verifyMutate })
+      );
+      setDomains({ data: [manualRow()] }, manualEnvelope);
+      setSource({ data: buildSource() });
+
+      render(<MigrationWizard projectId={PROJECT_ID} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /verify now/i }));
+      await waitFor(() =>
+        expect(verifyMutate).toHaveBeenCalledWith("old.acme.com")
+      );
+    });
+
+    it("blocks starting a migration when the deployment has no ingress host", () => {
+      setDomains({ data: [] }, { tls_mode: "manual", ingress_host: null });
+      setSource({ data: null });
+
+      render(<MigrationWizard projectId={PROJECT_ID} />);
+
+      expect(
+        screen.getByText(/contact your administrator/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /select source platform/i })
+      ).toBeNull();
+    });
+
+    it("keeps Verify now on a failed manual row and never shows Cloudflare copy", () => {
+      setDomains(
+        { data: [{ ...manualRow(), status: "failed" }] },
+        manualEnvelope
+      );
+      setSource({ data: buildSource() });
+
+      render(<MigrationWizard projectId={PROJECT_ID} />);
+
+      expect(screen.getByText("Setup failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /verify now/i })
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/ssl didn't issue/i)).toBeNull();
+      expect(screen.queryByText(/txt record/i)).toBeNull();
+    });
+
+    it("shows a neutral removal note for a suspended manual row", () => {
+      setDomains(
+        { data: [{ ...manualRow(), status: "suspended" }] },
+        manualEnvelope
+      );
+      setSource({ data: buildSource() });
+
+      render(<MigrationWizard projectId={PROJECT_ID} />);
+
+      expect(screen.getByText(/being removed/i)).toBeInTheDocument();
+      expect(screen.queryByText(/ssl didn't issue/i)).toBeNull();
+      expect(screen.queryByRole("button", { name: /verify now/i })).toBeNull();
+    });
+
+    it("shows management for an active manual row even when the CNAME preflight fails", () => {
+      setDomains(
+        {
+          data: [
+            buildDomain({
+              status: "active",
+              ssl_status: null,
+              source: "enterprise",
+              setup_records: [],
+            }),
+          ],
+        },
+        manualEnvelope
+      );
+      setSource({ data: buildSource() });
+      setPreflight(false);
+
+      render(<MigrationWizard projectId={PROJECT_ID} />);
+
+      expect(
+        screen.getByRole("button", { name: /^remove migration$/i })
+      ).toBeInTheDocument();
+    });
   });
 
   it("remove migration tears down source and migration domain", async () => {

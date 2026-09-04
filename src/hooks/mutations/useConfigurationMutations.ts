@@ -11,11 +11,14 @@ import {
   verifySubdomainAvailabilityAPICall,
   addCustomDomainWithPurposeAPICall,
   removeCustomDomainByPurposeAPICall,
+  verifyCustomDomainAPICall,
 } from "@/api/configurations/domains/configDomainsService";
 import type {
   SubdomainPayload,
   GoogleTrackingIdPayload,
   CustomDomainPurpose,
+  CustomDomainResponse,
+  CustomDomainsListResponse,
 } from "@/types";
 
 export function useSetDefaultRedirectMutation(projectId: string | undefined) {
@@ -24,17 +27,23 @@ export function useSetDefaultRedirectMutation(projectId: string | undefined) {
       defaultFallback,
       showAndroidPreview,
       showIosPreview,
+      copyToClipboardAndroid,
+      copyToClipboardIos,
     }: {
       defaultFallback: string;
       showAndroidPreview: boolean;
       showIosPreview: boolean;
+      copyToClipboardAndroid: boolean;
+      copyToClipboardIos: boolean;
     }) => {
       if (!projectId) return Promise.reject(new Error("No project selected"));
       return setDefaultRedirectAPICall(
         projectId,
         defaultFallback,
         showAndroidPreview,
-        showIosPreview
+        showIosPreview,
+        copyToClipboardAndroid,
+        copyToClipboardIos
       );
     },
     onSuccess: () => {
@@ -138,6 +147,54 @@ export function useAddCustomDomainMutation(projectId: string | undefined) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.projects.customDomain(projectId),
         });
+      }
+    },
+  });
+}
+
+// Writes the post-probe row into both domain caches for instant feedback;
+// deliberately no project-prefix invalidate — the response already is the fresh state.
+export function useVerifyCustomDomainMutation(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (hostname: string) => {
+      if (!projectId) return Promise.reject(new Error("No project selected"));
+      return verifyCustomDomainAPICall(projectId, hostname);
+    },
+    onSuccess: (response) => {
+      if (!projectId) return;
+      const envelope = response.data;
+      const row = envelope.custom_domain;
+      if (!row) return;
+
+      queryClient.setQueryData<CustomDomainsListResponse>(
+        queryKeys.projects.customDomains(projectId),
+        (current) => {
+          const rows = current?.custom_domains ?? [];
+          const replaced = rows.some((d) => d.hostname === row.hostname)
+            ? rows.map((d) => (d.hostname === row.hostname ? row : d))
+            : [...rows, row];
+          return {
+            ...current,
+            custom_domains: replaced,
+            tls_mode: envelope.tls_mode ?? current?.tls_mode,
+            ingress_host: envelope.ingress_host ?? current?.ingress_host,
+          };
+        }
+      );
+
+      // The singular cache is the primary-purpose shim.
+      if (row.purpose === "primary") {
+        queryClient.setQueryData<CustomDomainResponse>(
+          queryKeys.projects.customDomain(projectId),
+          (current) => ({
+            ...current,
+            custom_domain: row,
+            tls_mode: envelope.tls_mode ?? current?.tls_mode,
+            ingress_host: envelope.ingress_host ?? current?.ingress_host,
+          })
+        );
       }
     },
   });

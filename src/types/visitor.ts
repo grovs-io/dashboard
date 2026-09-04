@@ -50,7 +50,8 @@ export interface VisitorDetailMetrics {
   id: string;
   uuid: string;
   sdk_identifier: string;
-  platform: string;
+  /** Null when the visitor's device has no platform recorded. */
+  platform: string | null;
   sdk_attributes?: Record<string, string>;
   invited?: InvitedUser[];
   created_at: string;

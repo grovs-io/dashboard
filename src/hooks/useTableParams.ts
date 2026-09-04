@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   type SetStateAction,
   useCallback,
@@ -11,11 +11,32 @@ import {
 } from "react";
 import { DateRange } from "react-day-picker";
 import type { SortType } from "@/types";
+import type { QueryFilter } from "@/components/analytics/events/types";
+import { writeSearchParams } from "@/lib/searchParamsUrl";
 
 interface UseTableParamsOptions {
   defaultSortKey?: string;
   defaultPageSize?: number;
   defaultDateRange?: { from: Date; to: Date };
+}
+
+/** Compact URL shape for a QueryBar filter: field / value / operator / displayValue. */
+type SerializedFilter = {
+  f: string;
+  v: string;
+  o: QueryFilter["operator"];
+  d?: string;
+};
+
+/**
+ * Derive the bare platform string from the QueryBar chips. Platform is just
+ * another filter field on the analytics screens, so it has no separate URL key.
+ */
+export function platformFromQueryFilters(filters: QueryFilter[]): string {
+  return (
+    filters.find((f) => f.field === "platform" && f.operator === "is")?.value ??
+    ""
+  );
 }
 
 export function useTableParams(options?: UseTableParamsOptions) {
@@ -26,25 +47,11 @@ export function useTableParams(options?: UseTableParamsOptions) {
   } = options ?? {};
 
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
 
   // Helper to update multiple params at once
-  const updateParams = useCallback(
-    (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, val] of Object.entries(updates)) {
-        if (val === null || val === "") {
-          params.delete(key);
-        } else {
-          params.set(key, val);
-        }
-      }
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [searchParams, router, pathname]
-  );
+  const updateParams = useCallback((updates: Record<string, string | null>) => {
+    writeSearchParams(updates);
+  }, []);
 
   // --- Page ---
   const page = useMemo(() => {
@@ -145,6 +152,11 @@ export function useTableParams(options?: UseTableParamsOptions) {
     return getDefaultDates();
   }, [searchParams, getDefaultDates]);
 
+  // True when the range is the untouched default (no explicit from/to in the
+  // URL). Lets consumers avoid showing a sticky preset label (e.g. "Today")
+  // over a wider range carried in the URL across reloads.
+  const isDefaultDateRange = !searchParams.get("from");
+
   const setDateRange = useCallback(
     (range: DateRange | undefined) => {
       if (!range?.from || !range?.to) {
@@ -171,6 +183,74 @@ export function useTableParams(options?: UseTableParamsOptions) {
     [updateParams]
   );
 
+  // --- Query filters (QueryBar chips, URL-backed via the `filters` param) ---
+  const queryFilters = useMemo<QueryFilter[]>(() => {
+    const raw = searchParams.get("filters");
+    if (!raw) return [];
+    try {
+      const arr = JSON.parse(raw) as SerializedFilter[];
+      return arr.map((item, i) => ({
+        // Stable id derived from contents so React keys don't churn per render.
+        id: `url_${i}_${item.f}_${item.o}_${item.v}`,
+        field: item.f,
+        value: item.v,
+        operator: item.o,
+        ...(item.d ? { displayValue: item.d } : {}),
+      }));
+    } catch {
+      return [];
+    }
+  }, [searchParams]);
+
+  const writeFilters = useCallback(
+    (filters: QueryFilter[]) => {
+      const serialized = filters.length
+        ? JSON.stringify(
+            filters.map<SerializedFilter>((f) => ({
+              f: f.field,
+              v: f.value,
+              o: f.operator,
+              ...(f.displayValue ? { d: f.displayValue } : {}),
+            }))
+          )
+        : null;
+      updateParams({ filters: serialized, page: null });
+    },
+    [updateParams]
+  );
+
+  const addFilter = useCallback(
+    (
+      field: string,
+      value: string,
+      operator: QueryFilter["operator"],
+      displayValue?: string
+    ) => {
+      const exists = queryFilters.some(
+        (f) => f.field === field && f.value === value && f.operator === operator
+      );
+      if (exists) return;
+      writeFilters([
+        ...queryFilters,
+        {
+          id: `${field}_${operator}_${value}`,
+          field,
+          value,
+          operator,
+          ...(displayValue ? { displayValue } : {}),
+        },
+      ]);
+    },
+    [queryFilters, writeFilters]
+  );
+
+  const removeFilter = useCallback(
+    (id: string) => writeFilters(queryFilters.filter((f) => f.id !== id)),
+    [queryFilters, writeFilters]
+  );
+
+  const clearAllFilters = useCallback(() => writeFilters([]), [writeFilters]);
+
   // --- Total pages / total rows (server-driven, not URL) ---
   const [totalPages, setTotalPages] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
@@ -186,8 +266,14 @@ export function useTableParams(options?: UseTableParamsOptions) {
     setSearchTerm,
     dateRange,
     setDateRange,
+    isDefaultDateRange,
     platform,
     setPlatform,
+    queryFilters,
+    setQueryFilters: writeFilters,
+    addFilter,
+    removeFilter,
+    clearAllFilters,
     totalPages,
     setTotalPages,
     totalRows,

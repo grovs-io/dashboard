@@ -1,7 +1,18 @@
 {
   "hosting": [
     {
-      "site": "your-firebase-project",
+      "site": "linksquared-5cdc5",
+      "public": "out",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "site": "linksquared-test",
       "public": "out",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [

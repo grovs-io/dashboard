@@ -16,6 +16,8 @@ export interface InstancesResponse {
 
 export interface CreateInstanceResponse {
   instance: Instance;
+  // Self-hosted only: email => copyable invite link for members invited at creation.
+  invite_urls?: Record<string, string>;
 }
 
 export interface InstanceMembersResponse {

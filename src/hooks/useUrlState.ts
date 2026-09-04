@@ -1,7 +1,8 @@
 "use client";
 
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
+import { writeSearchParams } from "@/lib/searchParamsUrl";
 
 export function useUrlState(
   key: string,
@@ -24,8 +25,6 @@ export function useUrlState<T = string>(
   }
 ): [T, (v: T) => void] {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
 
   // Use refs for options to avoid dependency instability from inline objects
   const parseRef = useRef(options?.parse);
@@ -42,21 +41,18 @@ export function useUrlState<T = string>(
 
   const setValue = useCallback(
     (newValue: T) => {
-      const params = new URLSearchParams(searchParams.toString());
       const serialized = serializeRef.current
         ? serializeRef.current(newValue)
         : String(newValue);
 
-      if (serialized === String(defaultValue) || serialized === "") {
-        params.delete(key);
-      } else {
-        params.set(key, serialized);
-      }
-
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      writeSearchParams({
+        [key]:
+          serialized === String(defaultValue) || serialized === ""
+            ? null
+            : serialized,
+      });
     },
-    [searchParams, key, defaultValue, router, pathname]
+    [key, defaultValue]
   );
 
   return [value, setValue];

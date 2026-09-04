@@ -130,11 +130,11 @@ describe("McpAuthorizePage (consent)", () => {
     expect(screen.queryByText("abc-123-uuid")).not.toBeInTheDocument();
   });
 
-  it("falls back to 'An application' when client_name is absent", async () => {
+  it("falls back to 'the application' when client_name is absent", async () => {
     setSearchParams({ ...VALID_PARAMS, client_name: "" });
     render(<McpAuthorizePage />);
     await waitFor(() => {
-      expect(screen.getByText("An application")).toBeInTheDocument();
+      expect(screen.getAllByText("the application").length).toBeGreaterThan(0);
     });
   });
 

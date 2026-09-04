@@ -24,6 +24,8 @@ describe("createLinkSchema", () => {
     desktopRedirectType: "default",
     showPreviewAndroid: null,
     showPreviewIOS: null,
+    copyToClipboardAndroid: null,
+    copyToClipboardIOS: null,
     utmCampaign: "",
     utmMedium: "",
     utmSource: "",

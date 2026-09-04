@@ -1,0 +1,16 @@
+.git
+.github
+.husky
+.next
+node_modules
+coverage
+playwright-report
+test-results
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+Dockerfile
+Dockerfile.preview
+Dockerfile.test

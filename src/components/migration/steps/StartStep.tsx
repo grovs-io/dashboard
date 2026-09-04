@@ -19,10 +19,12 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 import {
   credentialsSchemaFor,
   migrationOldHostSchema,
 } from "@/schemas/migration";
+import ExtraHostsInput from "../ExtraHostsInput";
 import CredentialsFields, {
   APPSFLYER_EMPTY,
   BRANCH_EMPTY,
@@ -37,11 +39,15 @@ interface StartStepProps {
     provider: MigrationProvider;
     hostname: string;
     credentials: MigrationCredentials;
+    providerHosted: boolean;
+    extraHosts: string[];
   }) => void | Promise<void>;
   isSubmitting?: boolean;
   disabledUntilSeconds?: number;
   hostnameFieldError?: string | null;
+  extraHostsFieldError?: string | null;
   onHostnameChange?: (hostname: string) => void;
+  onProviderHostedChange?: (providerHosted: boolean) => void;
   preflight?: CustomDomainPreflight | null;
   preflightLoading?: boolean;
   /**
@@ -138,6 +144,81 @@ const ProviderDropdown = ({
   );
 };
 
+type DomainOwnership = "own" | "provider";
+
+const OwnershipPicker = ({
+  value,
+  onChange,
+  provider,
+}: {
+  value: DomainOwnership;
+  onChange: (value: DomainOwnership) => void;
+  provider: MigrationProvider | null;
+}) => {
+  const providerLabel =
+    provider === "appsflyer"
+      ? "AppsFlyer owns it (onelink.me)"
+      : "Branch owns it (app.link)";
+  const options: Array<{
+    value: DomainOwnership;
+    label: string;
+    description: string;
+  }> = [
+    {
+      value: "own",
+      label: "I own the domain",
+      description: "You'll point DNS to Grovs after SSL provisions.",
+    },
+    {
+      value: "provider",
+      label: providerLabel,
+      description: "SDK-only bridge — no DNS changes.",
+    },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Who owns the domain?"
+      className="flex flex-col gap-2"
+    >
+      {options.map((option) => {
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all",
+              selected
+                ? "border-primary/40 bg-primary/5 ring-[3px] ring-primary/10"
+                : "border-sidebar-border bg-secondary hover:bg-muted"
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                selected ? "border-primary" : "border-muted-foreground/40"
+              )}
+            >
+              {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium">{option.label}</span>
+              <span className="text-xs text-muted-foreground">
+                {option.description}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 /**
  * The combined first step of the migration wizard.
  *
@@ -151,13 +232,25 @@ const StartStep = ({
   isSubmitting = false,
   disabledUntilSeconds,
   hostnameFieldError,
+  extraHostsFieldError,
   onHostnameChange,
+  onProviderHostedChange,
   preflight,
   preflightLoading = false,
   cancelSlot,
 }: StartStepProps) => {
   const [provider, setProvider] = useState<MigrationProvider | null>(null);
   const [hostname, setHostname] = useState("");
+  const [ownership, setOwnership] = useState<DomainOwnership>("own");
+  const [extraHosts, setExtraHosts] = useState<string[]>([]);
+  const providerHosted = IS_SELF_HOSTED && ownership === "provider";
+
+  const handleOwnershipChange = (next: DomainOwnership) => {
+    setOwnership(next);
+    onProviderHostedChange?.(next === "provider");
+    // Preflight is meaningless for provider-owned domains; clear any pending hint.
+    onHostnameChange?.(next === "provider" ? "" : hostname);
+  };
   const [branchValues, setBranchValues] = useState<BranchValues>(BRANCH_EMPTY);
   const [appsflyerValues, setAppsflyerValues] =
     useState<AppsflyerValues>(APPSFLYER_EMPTY);
@@ -222,17 +315,32 @@ const StartStep = ({
       provider,
       hostname: hostnameValidation.value,
       credentials: credentialsParsed.value,
+      providerHosted,
+      extraHosts,
     });
   };
 
   const showHostnameError =
     touched && hostname.trim().length > 0 && !hostnameValidation.ok;
-  const oldHostLabel =
-    provider === "branch"
+  const oldHostLabel = providerHosted
+    ? provider === "appsflyer"
+      ? "AppsFlyer domain"
+      : "Branch domain"
+    : provider === "branch"
       ? "Branch subdomain"
       : provider === "appsflyer"
         ? "AppsFlyer subdomain"
         : "Provider subdomain";
+  const oldHostPlaceholder = providerHosted
+    ? provider === "appsflyer"
+      ? "yourapp.onelink.me"
+      : "xyz.app.link"
+    : "old.acme.com";
+  const providerName = provider === "appsflyer" ? "AppsFlyer" : "Branch";
+  const extraHostExample =
+    provider === "appsflyer"
+      ? "yourapp-alt.onelink.me"
+      : "xyz-alternate.app.link";
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
@@ -240,6 +348,17 @@ const StartStep = ({
         <Label>Which provider are you migrating from?</Label>
         <ProviderDropdown value={provider} onChange={setProvider} />
       </div>
+
+      {provider !== null && IS_SELF_HOSTED && (
+        <div className="flex flex-col gap-3">
+          <Label>Who owns the domain?</Label>
+          <OwnershipPicker
+            value={ownership}
+            onChange={handleOwnershipChange}
+            provider={provider}
+          />
+        </div>
+      )}
 
       {provider !== null && (
         <CredentialsFields
@@ -256,86 +375,121 @@ const StartStep = ({
         />
       )}
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="migration-old-host">{oldHostLabel}</Label>
-        <Input
-          id="migration-old-host"
-          type="text"
-          inputMode="url"
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          placeholder="old.acme.com"
-          value={hostname}
-          aria-invalid={showHostnameError ? true : undefined}
-          aria-describedby={
-            showHostnameError ? "migration-old-host-error" : undefined
-          }
-          onChange={(event) => {
-            const next = event.target.value.toLowerCase();
-            setHostname(next);
-            onHostnameChange?.(next);
-            if (!touched) setTouched(true);
-          }}
-          onBlur={() => setTouched(true)}
-        />
-        {showHostnameError && hostnameValidation.error && (
-          <p
-            id="migration-old-host-error"
-            className="flex items-center gap-1.5 text-xs text-destructive"
-          >
-            <AlertCircle className="h-3 w-3" />
-            {hostnameValidation.error}
-          </p>
-        )}
-        {!showHostnameError && hostnameFieldError && (
-          <p className="flex items-center gap-1.5 text-xs text-destructive">
-            <AlertCircle className="h-3 w-3" />
-            {hostnameFieldError}
-          </p>
-        )}
-        {!showHostnameError && !hostnameFieldError && preflightLoading && (
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Checking DNS…
-          </p>
-        )}
-        {!showHostnameError && !hostnameFieldError && preflight && (
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {preflight.cname_matches
-              ? "✓ CNAME already points to Grovs"
-              : preflight.dns_error
-                ? "Couldn't resolve — that's fine, you'll set it up later"
-                : preflight.cname_actual
-                  ? `Currently points to: ${preflight.cname_actual} (you'll flip this in step 4)`
-                  : "CNAME is not pointing to Grovs yet; you'll flip this in step 4"}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Submit this subdomain before changing DNS. We provision SSL first;
-          traffic moves only after DNS points this host to Grovs.
-        </p>
-      </div>
+      {provider !== null && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="migration-old-host">{oldHostLabel}</Label>
+          <Input
+            id="migration-old-host"
+            type="text"
+            inputMode="url"
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder={oldHostPlaceholder}
+            value={hostname}
+            aria-invalid={showHostnameError ? true : undefined}
+            aria-describedby={
+              showHostnameError ? "migration-old-host-error" : undefined
+            }
+            onChange={(event) => {
+              const next = event.target.value.toLowerCase();
+              setHostname(next);
+              if (!providerHosted) onHostnameChange?.(next);
+              if (!touched) setTouched(true);
+            }}
+            onBlur={() => setTouched(true)}
+          />
+          {showHostnameError && hostnameValidation.error && (
+            <p
+              id="migration-old-host-error"
+              className="flex items-center gap-1.5 text-xs text-destructive"
+            >
+              <AlertCircle className="h-3 w-3" />
+              {hostnameValidation.error}
+            </p>
+          )}
+          {!showHostnameError && hostnameFieldError && (
+            <p className="flex items-center gap-1.5 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
+              {hostnameFieldError}
+            </p>
+          )}
+          {!providerHosted &&
+            !showHostnameError &&
+            !hostnameFieldError &&
+            preflightLoading && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Checking DNS…
+              </p>
+            )}
+          {!providerHosted &&
+            !showHostnameError &&
+            !hostnameFieldError &&
+            preflight && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {preflight.cname_matches
+                  ? "✓ CNAME already points to Grovs"
+                  : preflight.dns_error
+                    ? "Couldn't resolve — that's fine, you'll set it up later"
+                    : preflight.cname_actual
+                      ? `Currently points to: ${preflight.cname_actual} (you'll flip this in step 4)`
+                      : "CNAME is not pointing to Grovs yet; you'll flip this in step 4"}
+              </p>
+            )}
+          {!providerHosted && (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Submit this subdomain before changing DNS. We provision SSL first;
+              traffic moves only after DNS points this host to Grovs.
+            </p>
+          )}
+        </div>
+      )}
 
-      <div className="flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-amber-900 dark:text-amber-200">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium">
-            Migration only works for custom provider subdomains.
-          </p>
-          <p className="text-xs leading-relaxed">
-            Use this only if your Branch or AppsFlyer links already run on a
-            subdomain you control. You will point that subdomain to Grovs. When
-            someone opens an old link, Grovs looks it up with your provider
-            credentials, creates the matching Grovs link, and redirects the
-            visitor. Traffic stays with your current provider until DNS points
-            to Grovs; after DNS is active and credentials verify, Grovs serves
-            those requests.
+      {provider !== null && providerHosted && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="migration-extra-hosts">Extra hosts (optional)</Label>
+          <ExtraHostsInput
+            inputId="migration-extra-hosts"
+            value={extraHosts}
+            onChange={setExtraHosts}
+            mainHost={hostname}
+            error={extraHostsFieldError}
+            placeholder={extraHostExample}
+          />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Sibling domains that serve the same links (for example{" "}
+            {extraHostExample}). Press Enter or comma to add each one.
           </p>
         </div>
-      </div>
+      )}
 
-      <div className="flex items-center justify-end gap-2">
+      {provider !== null &&
+        (providerHosted ? (
+          <div className="flex items-start gap-3 rounded-md border border-sidebar-border bg-muted/40 px-3 py-2.5">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              A transition bridge: links opened in your app resolve through the
+              Grovs SDK; web clicks keep going to {providerName}. Live
+              immediately — no DNS or SSL setup.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-amber-900 dark:text-amber-200">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="text-xs leading-relaxed">
+              Your {providerName} links must already run on a subdomain you own.
+              Traffic stays with {providerName} until you point DNS here.
+              {IS_SELF_HOSTED
+                ? ` For a ${providerName}-owned domain, pick the other option above.`
+                : ""}
+            </p>
+          </div>
+        ))}
+
+      {/* Pinned to the bottom of the dialog's scroll area so the actions are
+          always reachable, matching the create-link dialog. */}
+      <div className="sticky bottom-0 z-10 -mx-1 -mb-1 flex items-center justify-end gap-2 border-t border-sidebar-border bg-background px-1 pt-3 pb-1">
         {cancelSlot}
         <Button type="submit" disabled={!canSubmit}>
           {isSubmitting ? (

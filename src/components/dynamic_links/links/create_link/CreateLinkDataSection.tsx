@@ -8,6 +8,11 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Database, Plus } from "lucide-react";
 import React, { useState } from "react";
 
@@ -40,18 +45,17 @@ const CreateLinkDataSection = React.memo(function CreateLinkDataSection({
   });
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
         {/* Left — Inputs & List */}
-        <div className="flex flex-1 flex-col gap-2 overflow-auto">
+        <div className="flex flex-1 flex-col gap-2 overflow-auto min-w-0">
           <div className="flex flex-col gap-5 px-6 py-6">
             {/* Add new pair */}
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">Custom Data</label>
               <span className="text-xs text-muted-foreground">
-                Attach key-value pairs that will be delivered to your app
-                alongside the link. Useful for deep linking, referral tracking,
-                or passing custom context.
+                Enter a key and value, then press Add or Enter. Useful for deep
+                linking, referral tracking, or passing custom context.
               </span>
               <div
                 className={cn(
@@ -59,7 +63,7 @@ const CreateLinkDataSection = React.memo(function CreateLinkDataSection({
                   "border-sidebar-border focus-within:border-primary/40 focus-within:ring-[3px] focus-within:ring-primary/10"
                 )}
               >
-                <div className="flex-1 relative">
+                <div className="flex-1 min-w-0 relative">
                   <Input
                     className="border-none bg-transparent dark:bg-transparent rounded-none shadow-none font-mono text-sm tracking-tight focus-visible:ring-0 h-10"
                     placeholder="key"
@@ -82,7 +86,7 @@ const CreateLinkDataSection = React.memo(function CreateLinkDataSection({
                 <div className="flex items-center px-2 shrink-0 text-muted-foreground/50 select-none">
                   <span className="text-sm font-mono">=</span>
                 </div>
-                <div className="flex-1 relative border-l border-sidebar-border">
+                <div className="flex-1 min-w-0 relative border-l border-sidebar-border">
                   <Input
                     className="border-none bg-transparent dark:bg-transparent rounded-none shadow-none font-mono text-sm tracking-tight focus-visible:ring-0 h-10"
                     placeholder="value"
@@ -139,16 +143,42 @@ const CreateLinkDataSection = React.memo(function CreateLinkDataSection({
                       key={row.id}
                       className="flex items-center rounded-lg border border-sidebar-border bg-secondary/50 overflow-hidden group transition-colors hover:bg-secondary"
                     >
-                      <div className="flex items-center px-3 py-2.5 border-r border-sidebar-border bg-secondary min-w-[140px]">
-                        <span className="text-sm font-mono font-medium truncate">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            title=""
+                            className="flex items-center px-3 py-2.5 border-r border-sidebar-border bg-secondary min-w-[100px] max-w-[200px] shrink-0"
+                          >
+                            <span className="text-sm font-mono font-medium truncate">
+                              {row.original.key}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-[400px] break-all"
+                        >
                           {row.original.key}
-                        </span>
-                      </div>
-                      <div className="flex-1 px-3 py-2.5 min-w-0">
-                        <span className="text-sm font-mono text-muted-foreground truncate block">
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            title=""
+                            className="flex-1 px-3 py-2.5 min-w-0 overflow-hidden"
+                          >
+                            <span className="text-sm font-mono text-muted-foreground truncate block">
+                              {row.original.value?.toString()}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-[400px] break-all"
+                        >
                           {row.original.value?.toString()}
-                        </span>
-                      </div>
+                        </TooltipContent>
+                      </Tooltip>
                       {row.getVisibleCells().map((cell) =>
                         cell.column.id === "actions" ? (
                           <div key={cell.id} className="shrink-0 pr-1.5">

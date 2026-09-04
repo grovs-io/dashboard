@@ -29,6 +29,15 @@ const CreateLinksRedirectsSection = React.memo(
     setShowPreviewIOS,
     showPreviewIOS,
 
+    copyToClipboardAndroid,
+    setCopyToClipboardAndroid,
+    copyToClipboardIOS,
+    setCopyToClipboardIOS,
+    projectShowPreviewAndroid,
+    projectShowPreviewIOS,
+    projectCopyToClipboardAndroid,
+    projectCopyToClipboardIOS,
+
     desktopRedirectURL,
     setDesktopRedirectURL,
     desktopRedirectType,
@@ -52,6 +61,15 @@ const CreateLinksRedirectsSection = React.memo(
     setIosRedirectURL: React.Dispatch<React.SetStateAction<RedirectURL | null>>;
     setIosRedirectType: (value: string) => void;
     setShowPreviewIOS: (value: boolean | null) => void;
+
+    copyToClipboardAndroid: boolean | null;
+    setCopyToClipboardAndroid: (value: boolean | null) => void;
+    copyToClipboardIOS: boolean | null;
+    setCopyToClipboardIOS: (value: boolean | null) => void;
+    projectShowPreviewAndroid: boolean;
+    projectShowPreviewIOS: boolean;
+    projectCopyToClipboardAndroid: boolean;
+    projectCopyToClipboardIOS: boolean;
 
     desktopRedirectURL: RedirectURL | null;
     desktopRedirectType: string;
@@ -103,20 +121,9 @@ const CreateLinksRedirectsSection = React.memo(
       }));
     }, [iosRedirectType, setIosRedirectURL]);
 
-    useEffect(() => {
-      if (desktopRedirectType === DEFAULT) {
-        setDesktopRedirectURL(null);
-        return;
-      }
-      setDesktopRedirectURL((prev: RedirectURL | null) => ({
-        url: prev?.url ?? "",
-        open_app_if_installed: false,
-      }));
-    }, [desktopRedirectType, setDesktopRedirectURL]);
-
     return (
-      <div className="flex flex-1 flex-col">
-        <div className="flex flex-1 flex-col gap-2 overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
           <div className="flex flex-col gap-5 px-6 py-5">
             <CreateLinkAndroidRedirect
               androidRedirectURL={androidRedirectURL}
@@ -126,6 +133,10 @@ const CreateLinksRedirectsSection = React.memo(
               androidLinkBehaviour={androidLinkBehaviour}
               setAndroidLinkBehaviour={setAndroidLinkBehaviour}
               setShowPreviewAndroid={setShowPreviewAndroid}
+              copyToClipboardAndroid={copyToClipboardAndroid}
+              setCopyToClipboardAndroid={setCopyToClipboardAndroid}
+              projectShowPreviewAndroid={projectShowPreviewAndroid}
+              projectCopyToClipboardAndroid={projectCopyToClipboardAndroid}
               disabledActions={disabledActions}
               showErrors={showErrors}
             />
@@ -140,6 +151,10 @@ const CreateLinksRedirectsSection = React.memo(
               iosLinkBehaviour={iosLinkBehaviour}
               setIosLinkBehaviour={setIosLinkBehaviour}
               setShowPreviewIOS={setShowPreviewIOS}
+              copyToClipboardIOS={copyToClipboardIOS}
+              setCopyToClipboardIOS={setCopyToClipboardIOS}
+              projectShowPreviewIOS={projectShowPreviewIOS}
+              projectCopyToClipboardIOS={projectCopyToClipboardIOS}
               disabledActions={disabledActions}
               showErrors={showErrors}
             />

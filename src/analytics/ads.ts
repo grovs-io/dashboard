@@ -1,3 +1,5 @@
+import { GTM_ENABLED } from "@/lib/integrations";
+
 declare global {
   interface Window {
     dataLayer: Record<string, unknown>[];
@@ -5,7 +7,7 @@ declare global {
 }
 
 export function initDataLayer() {
-  if (typeof window === "undefined") return;
+  if (!GTM_ENABLED || typeof window === "undefined") return;
   window.dataLayer = window.dataLayer || [];
 }
 
@@ -13,7 +15,7 @@ export function pushToDataLayer(
   event: string,
   properties?: Record<string, unknown>
 ) {
-  if (typeof window === "undefined") return;
+  if (!GTM_ENABLED || typeof window === "undefined") return;
   if (!window.dataLayer) {
     window.dataLayer = [];
   }

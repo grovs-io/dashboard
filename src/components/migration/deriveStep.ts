@@ -27,6 +27,9 @@ export function deriveStep(input: DeriveStepInput): MigrationStep {
   if (sourceErrorStatus === 403) return "not_admin";
   if (domainsLoading || sourceLoading) return "loading";
 
+  // Provider-hosted sources never have a migration domain row or DNS steps.
+  if (source?.provider_hosted) return "managed";
+
   const migrationRow = domains?.find((d) => d.purpose === "migration");
 
   // No migration domain/source yet — show the combined migration create form.

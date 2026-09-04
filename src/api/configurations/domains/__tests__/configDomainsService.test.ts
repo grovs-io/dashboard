@@ -40,3 +40,17 @@ describe("plural custom_domains service", () => {
     );
   });
 });
+
+describe("verify-now service", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST sends the hostname to the verify endpoint", async () => {
+    const { verifyCustomDomainAPICall } =
+      await import("@/api/configurations/domains/configDomainsService");
+    await verifyCustomDomainAPICall("p1", "links.acme.com");
+    expect(POST).toHaveBeenCalledWith(
+      "/api/v1/projects/p1/custom_domains/verify",
+      { hostname: "links.acme.com" }
+    );
+  });
+});

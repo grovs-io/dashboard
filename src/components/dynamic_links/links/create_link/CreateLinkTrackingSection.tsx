@@ -1,5 +1,4 @@
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 
 const CreateLinkTrackingSection = ({
   source,
@@ -22,16 +21,6 @@ const CreateLinkTrackingSection = ({
     <div className="flex flex-1 flex-col">
       <div className="flex flex-1 flex-col gap-2 overflow-auto">
         <div className="flex flex-col gap-6 px-6 py-6">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">UTM Tracking</label>
-            <span className="text-xs text-muted-foreground">
-              These parameters are appended to your redirect URLs to track
-              traffic sources in Google Analytics, Play Store, or App Store.
-            </span>
-          </div>
-
-          <Separator />
-
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Source</label>
             <Input

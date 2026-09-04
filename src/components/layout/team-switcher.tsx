@@ -17,10 +17,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useProjectSelection } from "@/context/useProjectSelection";
+import { useUserContext } from "@/context/useUserContext";
 import { useCreateInstanceMutation } from "@/hooks/mutations/useInstanceMutations";
 import { useInstancesQuery } from "@/hooks/queries/useInstanceQueries";
 import type { Instance } from "@/types";
 import ProjectFormDialog from "../sidebar/ProjectFormDialog";
+import InviteLinkDialog, {
+  type InviteLink,
+  inviteLinksFromCreateResponse,
+} from "@/components/settings/InviteLinkDialog";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 import { useState } from "react";
 import { showGenericError } from "@/lib/Notifications";
 import { trackEvent, EVENTS } from "@/analytics";
@@ -28,8 +34,10 @@ import { trackEvent, EVENTS } from "@/analytics";
 export function ProjectSwitcher() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [inviteLinks, setInviteLinks] = useState<InviteLink[] | null>(null);
 
   const { setSelectedInstance, selectedInstance } = useProjectSelection();
+  const { fetchCurrentUser } = useUserContext();
 
   const { data: instances } = useInstancesQuery();
 
@@ -60,6 +68,14 @@ export function ProjectSwitcher() {
       const instance = response.data.instance;
       trackEvent(EVENTS.PROJECT_CREATED, { projectName });
       setSelectedInstance(instance);
+      const links = inviteLinksFromCreateResponse(response.data.invite_urls);
+      if (links) setInviteLinks(links);
+      try {
+        // Without this the cached roles lack the new instance and AdminOnlyDisplay hides everything.
+        await fetchCurrentUser();
+      } catch {
+        // silently ignore fetchCurrentUser failure
+      }
       // No need to manually refetch instances — the mutation auto-invalidates the query
       setDialogOpen(false);
     } catch {
@@ -83,9 +99,9 @@ export function ProjectSwitcher() {
               <div className="bg-blue-500/10 text-foreground dark:bg-blue-400/10 flex aspect-square size-8 items-center justify-center rounded-lg">
                 <GalleryVerticalEnd className="size-4" />
               </div>
-              <div className="grid flex-1 text-left leading-tight">
+              <div className="grid min-w-0 flex-1 text-left leading-tight">
                 <span className="truncate text-sm font-semibold tracking-tight">
-                  {selectedInstance?.production?.name}
+                  {selectedInstance?.production?.name ?? selectedInstance?.name}
                 </span>
                 <span className="truncate text-[11px] text-muted-foreground">
                   Project
@@ -135,12 +151,12 @@ export function ProjectSwitcher() {
                 </div>
               </div>
             )}
-            <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+            <div className="max-h-[calc(100vh-200px)] overflow-x-hidden overflow-y-auto">
               {instances
                 ?.filter((project: Instance) =>
                   searchTerm === ""
                     ? true
-                    : project.production.name
+                    : (project.production?.name ?? project.name ?? "")
                         .toLowerCase()
                         .includes(searchTerm.toLowerCase())
                 )
@@ -148,15 +164,17 @@ export function ProjectSwitcher() {
                   <DropdownMenuItem
                     key={project.id}
                     onClick={() => handleSelectInstance(project)}
-                    className="gap-2 p-2"
+                    className="gap-2 overflow-hidden p-2"
                   >
-                    {project.production.name}
+                    <span className="min-w-0 flex-1 truncate">
+                      {project.production?.name ?? project.name}
+                    </span>
                   </DropdownMenuItem>
                 ))}
               {(instances?.length ?? 0) > 10 &&
                 searchTerm !== "" &&
                 instances?.filter((project: Instance) =>
-                  project.production.name
+                  (project.production?.name ?? project.name ?? "")
                     .toLowerCase()
                     .includes(searchTerm.toLowerCase())
                 ).length === 0 && (
@@ -173,6 +191,12 @@ export function ProjectSwitcher() {
           onOpenChange={setDialogOpen}
           handleCreateProject={handleCreateInstance}
         />
+        {IS_SELF_HOSTED && (
+          <InviteLinkDialog
+            links={inviteLinks}
+            onOpenChange={(open) => !open && setInviteLinks(null)}
+          />
+        )}
       </SidebarMenuItem>
     </SidebarMenu>
   );

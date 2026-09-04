@@ -9,7 +9,8 @@ import { config } from "./config";
 const URL = config.apiUrl;
 
 const DEFAULT_TIMEOUT = 60000;
-const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
+// 503 is the backend's rate-limit response (Rack::Attack), retrying it deepens the throttle
+const RETRYABLE_STATUS_CODES = new Set([500, 502, 504]);
 const IDEMPOTENT_METHODS = new Set(["GET", "PUT", "DELETE"]);
 
 export interface RequestOptions {
@@ -109,7 +110,21 @@ const makeRequest = async (
             ? "Unable to connect. Check your internet connection."
             : getErrorMessage(status);
 
-        throw new ApiError(message, status, error.code, error.response?.data);
+        // Prefer the backend's machine-readable `error_code` (e.g.
+        // retention_window_exceeded, query_too_heavy) over the axios transport
+        // code, so callers can branch on it. Fall back to the axios code for
+        // transport-level failures that never reached the backend.
+        const body = error.response?.data;
+        const backendCode =
+          body && typeof body === "object" && "error_code" in body
+            ? (body as { error_code?: unknown }).error_code
+            : undefined;
+        const code =
+          typeof backendCode === "string" && backendCode.length > 0
+            ? backendCode
+            : error.code;
+
+        throw new ApiError(message, status, code, body);
       }
 
       throw error;

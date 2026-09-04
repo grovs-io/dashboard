@@ -5,7 +5,36 @@ import {
   mapKeyPairValues,
   parseSecondsInDaysHoursMinutesSeconds,
   formatPlatformName,
+  formatDateParam,
+  formatDateTimeParam,
 } from "../utils";
+
+describe("formatDateTimeParam", () => {
+  it("emits local YYYY-MM-DD HH:mm:ss with zero-padding", () => {
+    expect(formatDateTimeParam(new Date(2026, 5, 26, 14, 30, 5))).toBe(
+      "2026-06-26 14:30:05"
+    );
+    expect(formatDateTimeParam(new Date(2026, 0, 5, 0, 0, 0))).toBe(
+      "2026-01-05 00:00:00"
+    );
+  });
+});
+
+describe("formatDateParam", () => {
+  it("uses the LOCAL calendar date, not UTC (no off-by-one)", () => {
+    // Local midnight — toISOString() would shift this to the previous day for
+    // any positive UTC offset. We must get the local date back unchanged.
+    expect(formatDateParam(new Date(2026, 5, 26, 0, 0, 0))).toBe("2026-06-26");
+    // End of day must stay on the same local date too.
+    expect(formatDateParam(new Date(2026, 5, 26, 23, 59, 59))).toBe(
+      "2026-06-26"
+    );
+  });
+
+  it("zero-pads month and day", () => {
+    expect(formatDateParam(new Date(2026, 0, 5))).toBe("2026-01-05");
+  });
+});
 
 describe("cn", () => {
   it("merges class names", () => {

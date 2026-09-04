@@ -1,9 +1,10 @@
 "use client";
 
 import { DateRangePicker } from "@/components/dateRangePicker/DateRangePicker";
+import { retentionMinDate } from "@/lib/analyticsLimits";
 import CustomizeColumns from "@/components/common/customize-columns";
 import { Input } from "@/components/ui/input";
-import { formatApiDate } from "@/lib/dateUtils";
+import { formatApiEndOfDay, formatApiStartOfDay } from "@/lib/dateUtils";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { useSetRevenueCollectionMutation } from "@/hooks/mutations/useInstanceMutations";
 import { ApiError } from "@/lib/ApiError";
@@ -26,6 +27,11 @@ import { useTheme } from "next-themes";
 const RevenuePage = () => {
   const { resolvedTheme } = useTheme();
   const { selectedProject, selectedInstance } = useProjectSelection();
+  // Gated endpoints 422 past the plan window; stop the range being picked at all.
+  const retentionMin = useMemo(
+    () => retentionMinDate(selectedInstance?.analytics_retention, new Date()),
+    [selectedInstance]
+  );
   const revenueCollectionMutation = useSetRevenueCollectionMutation();
 
   const {
@@ -54,12 +60,12 @@ const RevenuePage = () => {
     const params: GetRevenueParams = {
       ascending: sort.ascending,
       current_page: page,
-      start_date: formatApiDate(dateRange.from),
+      start_date: formatApiStartOfDay(dateRange.from),
       sort_by: sort.sortKey,
       per_page: rowsPerPage,
     };
     if (searchTerm !== "") params.term = searchTerm;
-    if (dateRange.to) params.end_date = formatApiDate(dateRange.to);
+    if (dateRange.to) params.end_date = formatApiEndOfDay(dateRange.to);
     if (platform !== "") params.platform = platform;
     return params;
   }, [
@@ -293,7 +299,11 @@ const RevenuePage = () => {
                       selectedColumns={selectedColumns}
                       setSelectedColumns={setSelectedColumns}
                     />
-                    <DateRangePicker date={dateRange} setDate={setDateRange} />
+                    <DateRangePicker
+                      date={dateRange}
+                      setDate={setDateRange}
+                      minDate={retentionMin}
+                    />
                   </div>
                 </div>
 

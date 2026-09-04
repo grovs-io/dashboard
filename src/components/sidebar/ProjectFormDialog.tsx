@@ -83,7 +83,7 @@ const ProjectFormDialog = ({
   return (
     <>
       {isFirstProject && (
-        <div className="absolute z-11 w-full h-full bg-primary-foreground" />
+        <div className="fixed inset-0 z-40 bg-primary-foreground" />
       )}
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
