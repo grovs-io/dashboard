@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { IS_SELF_HOSTED } from "@/lib/edition";
 import { queryKeys } from "@/lib/queryKeys";
 import { ApiError } from "@/lib/ApiError";
 import {
@@ -31,7 +32,7 @@ export function useSubscriptionQuery(instanceId: string | undefined) {
         throw error;
       }
     },
-    enabled: !!instanceId,
+    enabled: !!instanceId && !IS_SELF_HOSTED, // no Stripe on self-hosted
   });
 }
 
