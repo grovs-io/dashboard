@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
-import { IS_SELF_HOSTED } from "@/lib/edition";
+import { IS_ENTERPRISE, IS_SELF_HOSTED } from "@/lib/edition";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
 import { useIsInstanceAdmin } from "@/hooks/useIsInstanceAdmin";
 import { getSsoConnectionAPICall } from "@/api/sso/ssoService";
@@ -13,7 +13,9 @@ export function useSsoAccess(instanceId: string | undefined): {
 } {
   const subscriptionQuery = useSubscriptionQuery(instanceId);
   const isAdmin = useIsInstanceAdmin();
+  // SSO/SCIM live in the enterprise backend; a Community Edition build has no routes for them.
   const entitled =
+    IS_ENTERPRISE &&
     !!instanceId &&
     (IS_SELF_HOSTED || subscriptionQuery.data?.isEnterprise === true);
   const isResolving =
