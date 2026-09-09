@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isRateLimited } from "../rateLimit";
 import { serverConfig } from "@/lib/serverConfig";
+import { proxyClientIpHeaders } from "@/lib/proxyClientIp";
 
 const API_URL = serverConfig.apiUrl;
 const CLIENT_ID = serverConfig.clientId;
@@ -49,7 +50,10 @@ export async function POST(request: NextRequest) {
   try {
     response = await fetch(`${API_URL}/oauth/token`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...proxyClientIpHeaders(request),
+      },
       body: JSON.stringify({
         grant_type: "password",
         email: body.email,

@@ -7,4 +7,5 @@ export const serverConfig = {
   apiPath: process.env.NEXT_PUBLIC_API_PATH ?? "/api/v1",
   clientId: process.env.OAUTH_CLIENT_UID ?? process.env.NEXT_PUBLIC_CLIENT_ID,
   clientSecret: process.env.OAUTH_CLIENT_SECRET ?? process.env.CLIENT_SECRET,
+  trustedProxySecret: process.env.TRUSTED_PROXY_SECRET,
 };

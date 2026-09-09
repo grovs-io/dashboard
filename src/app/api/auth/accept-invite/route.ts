@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isRateLimited } from "../rateLimit";
 import { serverConfig } from "@/lib/serverConfig";
+import { proxyClientIpHeaders } from "@/lib/proxyClientIp";
 
 // Server-side so the client id is attached from the runtime env, not the browser.
 const API_URL = serverConfig.apiUrl;
@@ -52,7 +53,10 @@ export async function POST(request: NextRequest) {
   try {
     response = await fetch(`${API_URL}${API_PATH}/users/accept_invite`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...proxyClientIpHeaders(request),
+      },
       body: JSON.stringify({
         name: body.name,
         invitation_token: body.invitation_token,

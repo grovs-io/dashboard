@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverConfig } from "@/lib/serverConfig";
+import { proxyClientIpHeaders } from "@/lib/proxyClientIp";
 
 const API_URL = serverConfig.apiUrl;
 const CLIENT_ID = serverConfig.clientId;
@@ -34,7 +35,10 @@ export async function POST(request: NextRequest) {
   try {
     response = await fetch(`${API_URL}/oauth/revoke`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...proxyClientIpHeaders(request),
+      },
       body: JSON.stringify({
         token: body.token,
         client_id: CLIENT_ID,

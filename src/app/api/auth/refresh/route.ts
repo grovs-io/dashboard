@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverConfig } from "@/lib/serverConfig";
+import { proxyClientIpHeaders } from "@/lib/proxyClientIp";
 
 const API_URL = serverConfig.apiUrl;
 const API_PATH = serverConfig.apiPath;
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...proxyClientIpHeaders(request),
           ...(body.token ? { Authorization: `Bearer ${body.token}` } : {}),
         },
         body: JSON.stringify({
