@@ -220,6 +220,21 @@ describe("useConfigurationMutations", () => {
       });
     });
 
+    it("invalidates the instances list, which is where the link dialog reads the host", async () => {
+      mockedSetSubdomain.mockResolvedValueOnce({ data: {} } as never);
+      const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+      const { result } = renderHook(() => useSetSubdomainMutation("proj-1"), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await act(async () => {
+        await result.current.mutateAsync({ subdomain: "test" });
+      });
+
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["instances"] });
+    });
+
     it("does not invalidate when projectId is undefined", async () => {
       const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 

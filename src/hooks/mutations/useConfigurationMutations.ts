@@ -93,6 +93,8 @@ export function useSetSubdomainMutation(projectId: string | undefined) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.projects.domainConfig(projectId),
         });
+        // The link dialog reads the host off the cached instances list, not the domain config.
+        queryClient.invalidateQueries({ queryKey: queryKeys.instances.all });
       }
     },
   });
@@ -147,6 +149,8 @@ export function useAddCustomDomainMutation(projectId: string | undefined) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.projects.customDomain(projectId),
         });
+        // The link dialog reads the host off the cached instances list, not the domain config.
+        queryClient.invalidateQueries({ queryKey: queryKeys.instances.all });
       }
     },
   });
@@ -196,6 +200,7 @@ export function useVerifyCustomDomainMutation(projectId: string | undefined) {
           })
         );
       }
+      queryClient.invalidateQueries({ queryKey: queryKeys.instances.all });
     },
   });
 }
@@ -216,6 +221,8 @@ export function useRemoveCustomDomainMutation(projectId: string | undefined) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.projects.customDomain(projectId),
         });
+        // The link dialog reads the host off the cached instances list, not the domain config.
+        queryClient.invalidateQueries({ queryKey: queryKeys.instances.all });
       }
     },
   });
