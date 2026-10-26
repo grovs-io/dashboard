@@ -8,9 +8,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -19,145 +16,221 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
+import { useState, type ComponentType, type SVGProps } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { withNavQuery } from "@/components/layout/navConfig";
 
-// Restrained active treatment (DESIGN.md: minimal, restrained color) — accent
-// text + icon and a thin left bar, NO filled surface and normal weight. The
-// transparent overrides cancel the flat gray default from ui/sidebar.
-const topButtonClass = cn(
-  "relative transition-colors",
-  "data-[active=true]:bg-transparent data-[active=true]:font-normal data-[active=true]:text-[color:var(--chart-users)]",
-  "[&[data-active=true]>svg]:text-[color:var(--chart-users)]",
-  "before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-r-full before:bg-[var(--chart-users)] before:opacity-0 before:transition-opacity data-[active=true]:before:opacity-100"
+const activeClass =
+  "data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-foreground [&[data-active=true]>svg]:text-foreground";
+
+const rowClass = cn(
+  "h-8 gap-2 rounded-[7px] text-[13.5px] transition-colors",
+  activeClass
 );
 
-const subButtonClass = cn(
-  "transition-colors",
-  "data-[active=true]:bg-transparent data-[active=true]:text-[color:var(--chart-users)] data-[active=true]:font-medium"
+const subRowClass = cn(
+  "h-7 translate-x-0 rounded-[7px] text-[13px] text-muted-foreground transition-colors hover:text-foreground",
+  activeClass
 );
 
-// Accent the existing tree line (the sub list's left border) for the active
-// row, instead of adding a separate bar. A short centered segment matches the
-// top-level bar height (h-4) so the two indicators read the same. Offset ≈ the
-// sub list's px-2.5 padding + 1px border so it lands on the line; the <li> is
-// already `relative`.
-const subActiveLineClass =
-  "before:absolute before:-left-[11px] before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-[var(--chart-users)] before:content-['']";
+const childIconClass = (active: boolean) =>
+  cn("!size-3.5", active ? "text-foreground" : "text-muted-foreground");
 
-export const RenderMenuItem = ({
-  item,
-  currentPath,
+// Child content (icon or text) lines up under the group label (px-2 + icon + gap = pl-6 + px-2).
+const subListClass = "mx-0 gap-0.5 border-l-0 px-0 pl-6 py-0.5";
+
+const chevronClass =
+  "ml-auto !size-3.5 text-muted-foreground/60 transition-transform duration-200";
+
+const useNav = () => {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // A detail route (/segments/abc) keeps its page highlighted.
+  const isActive = (url: string) =>
+    url === pathname || (url !== "/" && pathname.startsWith(`${url}/`));
+  const href = (url: string) => withNavQuery(url, searchParams);
+  return { pathname, isActive, href };
+};
+
+export function NavItem({ item }: { item: navItemType }) {
+  const { isActive, href } = useNav();
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={isActive(item.url)}
+        tooltip={item.title}
+        className={rowClass}
+      >
+        <Link href={href(item.url)}>
+          {item.icon && <item.icon />}
+          <span>{item.title}</span>
+          {item.badge && (
+            <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider leading-none rounded bg-[var(--accent)] text-[color:var(--chart-users)] px-1.5 py-0.5">
+              {item.badge}
+            </span>
+          )}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+export function NavGroup({
+  label,
+  icon: Icon,
+  items,
+  open,
+  active,
+  onOpenChange,
 }: {
-  item: navItemType;
-  currentPath: string;
-}) => {
-  const { state, setOpen } = useSidebar();
+  label: string;
+  icon?: LucideIcon;
+  items: navItemType[];
+  open: boolean;
+  active: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { state, setOpen, isMobile } = useSidebar();
+  return (
+    <Collapsible
+      asChild
+      open={open}
+      onOpenChange={onOpenChange}
+      className="group/collapsible"
+    >
+      <SidebarMenuItem>
+        <CollapsibleTrigger
+          asChild
+          onClick={(e) => {
+            // Desktop icon-only mode has nowhere to show children; the mobile sheet always does.
+            if (!isMobile && state === "collapsed") {
+              e.preventDefault();
+              setOpen(true);
+              onOpenChange(true);
+            }
+          }}
+        >
+          <SidebarMenuButton
+            tooltip={label}
+            className={cn(
+              rowClass,
+              active && "text-foreground [&>svg]:text-foreground"
+            )}
+          >
+            {Icon && <Icon />}
+            <span>{label}</span>
+            <ChevronRight
+              className={cn(
+                chevronClass,
+                "group-data-[state=open]/collapsible:rotate-90"
+              )}
+            />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub className={subListClass}>
+            {items.map((item) => (
+              <NavSubItem key={item.title} item={item} />
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
+function NavSubItem({ item }: { item: navItemType }) {
+  const { pathname, isActive, href } = useNav();
   const router = useRouter();
 
-  const searchParams = useSearchParams();
-  const query = searchParams.toString();
+  const childActive =
+    item.items?.some((sub) => pathname.startsWith(sub.url)) ?? false;
+  // Opens whenever navigation lands on one of its pages; adjusted during render.
+  const [open, setOpen] = useState(childActive);
+  const [wasActive, setWasActive] = useState(childActive);
+  if (childActive !== wasActive) {
+    setWasActive(childActive);
+    if (childActive) setOpen(true);
+  }
 
-  const returnUrlWithParams = (url: string) => {
-    const urlWithParams = `${url}${query ? `?${query}` : ""}`;
-    return urlWithParams;
-  };
-
-  const isActive = (url: string) => {
-    return url === currentPath;
-  };
-
-  const isParentActive = (parentUrl: string, subItems?: { url: string }[]) => {
-    if (parentUrl !== "#" && currentPath.startsWith(parentUrl)) {
-      return true;
-    }
-    return subItems?.some((sub) => currentPath.startsWith(sub.url)) ?? false;
-  };
-
-  if (item.itemType === "collapsible") {
-    const parentActive = isParentActive(item.url, item.items);
+  if (!item.items) {
     return (
-      <Collapsible
-        key={item.title}
-        asChild
-        defaultOpen={parentActive}
-        className="group/collapsible"
-      >
-        <SidebarMenuItem>
-          <CollapsibleTrigger
-            asChild
-            onClick={() => {
-              if (state === "collapsed") {
-                setOpen(true);
-              }
-              // Navigate to first sub-item if not already on a child route
-              const firstSubUrl = item.items?.[0]?.url;
-              if (firstSubUrl && !isParentActive(item.url, item.items)) {
-                router.push(returnUrlWithParams(firstSubUrl));
-              }
-            }}
-          >
-            <SidebarMenuButton
-              tooltip={item.title}
-              isActive={isActive(item.url)}
-              className={cn(
-                topButtonClass,
-                // Tint the icon when the section contains the active page, so the
-                // active section reads even when collapsed or scrolled.
-                parentActive && "[&>svg]:text-[color:var(--chart-users)]"
-              )}
-            >
-              {item.icon && <item.icon />}
-              <span>{item.title}</span>
-              <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-            </SidebarMenuButton>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <SidebarMenuSub>
-              {item.items?.map((subItem) => (
-                <SidebarMenuSubItem
-                  key={subItem.title}
-                  className={cn(isActive(subItem.url) && subActiveLineClass)}
-                >
-                  <SidebarMenuSubButton
-                    asChild
-                    isActive={isActive(subItem.url)}
-                    className={subButtonClass}
-                  >
-                    <Link href={returnUrlWithParams(subItem.url)}>
-                      <span>{subItem.title}</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-              ))}
-            </SidebarMenuSub>
-          </CollapsibleContent>
-        </SidebarMenuItem>
-      </Collapsible>
-    );
-  } else {
-    return (
-      <SidebarMenuItem key={item.title}>
-        <SidebarMenuButton
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton
           asChild
           isActive={isActive(item.url)}
-          tooltip={item.title}
-          className={topButtonClass}
+          className={subRowClass}
         >
-          <Link href={returnUrlWithParams(item.url)}>
-            {item.icon && <item.icon />}
-            <span>{item.title}</span>
-            {item.badge && (
-              <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider leading-none rounded bg-[var(--accent)] text-[color:var(--chart-users)] px-1.5 py-0.5">
-                {item.badge}
-              </span>
+          <Link href={href(item.url)}>
+            {item.icon && (
+              <item.icon className={childIconClass(isActive(item.url))} />
             )}
+            <span>{item.title}</span>
           </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
+        </SidebarMenuSubButton>
+      </SidebarMenuSubItem>
     );
   }
-};
+
+  return (
+    <Collapsible
+      asChild
+      open={open}
+      onOpenChange={setOpen}
+      className="group/sub"
+    >
+      <SidebarMenuSubItem>
+        <CollapsibleTrigger
+          asChild
+          onClick={() => {
+            const first = item.items?.[0]?.url;
+            if (first && !childActive) router.push(href(first));
+          }}
+        >
+          <SidebarMenuSubButton
+            asChild
+            className={cn(subRowClass, childActive && "text-foreground")}
+          >
+            <button type="button" className="w-full">
+              {item.icon && (
+                <item.icon className={childIconClass(childActive)} />
+              )}
+              <span>{item.title}</span>
+              <ChevronRight
+                className={cn(
+                  chevronClass,
+                  "group-data-[state=open]/sub:rotate-90"
+                )}
+              />
+            </button>
+          </SidebarMenuSubButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 pl-3 py-0.5">
+            {item.items.map((sub) => (
+              <SidebarMenuSubItem key={sub.title}>
+                <SidebarMenuSubButton
+                  asChild
+                  isActive={isActive(sub.url)}
+                  className={subRowClass}
+                >
+                  <Link href={href(sub.url)}>
+                    {sub.icon && (
+                      <sub.icon className={childIconClass(isActive(sub.url))} />
+                    )}
+                    <span>{sub.title}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuSubItem>
+    </Collapsible>
+  );
+}
 
 export interface navItemType {
   title: string;
@@ -169,22 +242,6 @@ export interface navItemType {
   items?: {
     title: string;
     url: string;
-    icon?: LucideIcon;
+    icon?: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
   }[];
-}
-export function NavMain({ items }: { items: navItemType[] }) {
-  const pathname = usePathname();
-
-  return (
-    <SidebarGroup role="navigation" aria-label="Platform">
-      <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
-        Platform
-      </SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item) => (
-          <RenderMenuItem key={item.title} item={item} currentPath={pathname} />
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
 }

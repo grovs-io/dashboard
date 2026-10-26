@@ -45,7 +45,11 @@ export function useCreateInstanceMutation() {
       members: { email: string; role: string }[];
     }) => createInstanceAPICall(name, members),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.instances.all });
+      // Only the list: a prefix match would refetch every cached project's details too.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.instances.all,
+        exact: true,
+      });
     },
   });
 }

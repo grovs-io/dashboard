@@ -7,6 +7,9 @@ import {
   TEST_CAMPAIGN,
   TEST_SUBSCRIPTION,
   TEST_METRICS_OVERVIEW,
+  TEST_DASHBOARD,
+  TEST_METRIC_WIDGET,
+  TEST_METRIC_QUERY,
   MOCK_TOKENS,
 } from "./test-data";
 
@@ -175,7 +178,7 @@ export async function setupApiMocks(page: Page) {
     }
   );
 
-  // Project configuration
+  // Project configuration: no push credentials here; the push e2e tests mock their own.
   await page.route(
     `**/api/v1/instances/${TEST_INSTANCE.id}/configurations`,
     async (route) => {
@@ -352,6 +355,8 @@ export async function setupApiMocks(page: Page) {
             default_fallback: "https://test.grovs.io",
             show_preview_android: false,
             show_preview_ios: false,
+            in_app_browser_page_ios: false,
+            in_app_browser_page_android: false,
           },
         }),
       });
@@ -635,6 +640,59 @@ export async function setupApiMocks(page: Page) {
           sparkline: [],
           median_churn_day: null,
         }),
+      });
+    }
+  );
+
+  // Custom dashboards: none by default so /dashboard opens on the Overview.
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/dashboards**`,
+    async (route) => {
+      const request = route.request();
+      const method = request.method();
+      const isWidget = /\/widgets(\/|$|\?)/.test(
+        new URL(request.url()).pathname
+      );
+      let body: unknown = {};
+      if (method === "GET") body = { dashboards: [] };
+      else if (method === "POST" || method === "PATCH") {
+        const payload = request.postDataJSON() ?? {};
+        body = isWidget
+          ? { widget: { ...TEST_METRIC_WIDGET, ...payload } }
+          : { dashboard: { ...TEST_DASHBOARD, widgets: [], ...payload } };
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
+    }
+  );
+
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/analytics/query*`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(TEST_METRIC_QUERY),
+      });
+    }
+  );
+}
+
+export async function mockDashboards(
+  page: Page,
+  dashboards: unknown[] = [TEST_DASHBOARD]
+) {
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/dashboards`,
+    async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ dashboards }),
       });
     }
   );

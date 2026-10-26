@@ -2,24 +2,60 @@
 
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "../ui/dialog";
-import {
-  ArrowRight,
-  Globe,
-  ShieldCheck,
-  HeadphonesIcon,
-  FileText,
-  Server,
-  Users,
-  Lock,
-  BarChart3,
-} from "lucide-react";
+import { ChevronRight, XIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { config } from "@/lib/config";
+
+const FEATURES = [
+  "No metering of users, apps or events",
+  "OIDC SSO and SCIM provisioning",
+  "Audit log with SIEM export",
+  "Versioned releases with a patch SLA",
+  "Security pack, BAA and DPA",
+  "Deployment help from our engineers",
+];
+
+const ROWS = [
+  {
+    key: "Our cloud",
+    title: "Shared or dedicated",
+    body: "We run it for you. A dedicated instance keeps your data apart and is required for health data.",
+  },
+  {
+    key: "Self-hosted",
+    title: "Your infrastructure",
+    body: "Run grovs in your own cloud or data center. Your data never leaves it, and our staff have no access.",
+  },
+  {
+    key: "Pricing",
+    title: "One flat price a year",
+    body: "Agreed up front, per deployment. It doesn't change as your user count grows.",
+  },
+];
+
+const Check = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
+    aria-hidden
+    className="mt-1 flex-none"
+  >
+    <path
+      d="M3 8.4l3.2 3.2L13 4.8"
+      stroke="#1F6FE5"
+      strokeWidth="2.2"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const EnterpriseDialog = ({
   open,
@@ -30,139 +66,107 @@ const EnterpriseDialog = ({
   onOpenChange: (open: boolean) => void;
   handleUpgrade: () => void;
 }) => {
-  const benefits = [
-    {
-      icon: Globe,
-      title: "Custom Domains",
-      desc: "White-label links with your brand",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Audit Logs",
-      desc: "Full visibility into team activity",
-    },
-    {
-      icon: HeadphonesIcon,
-      title: "Dedicated CSM",
-      desc: "Your own success manager",
-    },
-    {
-      icon: FileText,
-      title: "Custom Billing",
-      desc: "Flexible invoicing & terms",
-    },
-    {
-      icon: Server,
-      title: "Self-Hosted Option",
-      desc: "Deploy on your infrastructure",
-    },
-    {
-      icon: Users,
-      title: "Migration Support",
-      desc: "Seamless platform onboarding",
-    },
-    {
-      icon: Lock,
-      title: "SLA Guarantees",
-      desc: "Contractual uptime commitments",
-    },
-    {
-      icon: BarChart3,
-      title: "Advanced Reporting",
-      desc: "Custom dashboards & exports",
-    },
-  ];
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        aria-describedby="enterprise-plan"
-        className="flex flex-col w-full !max-w-[860px] gap-0 p-0 overflow-hidden"
+        showCloseButton={false}
+        className="grid w-[min(980px,calc(100vw-32px))] max-w-none sm:max-w-none max-h-[calc(100vh-2rem)] grid-cols-1 gap-0 overflow-y-auto rounded-none border-0 p-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
       >
-        <DialogHeader className="sr-only">
-          <DialogTitle>Enterprise Plan</DialogTitle>
-          <DialogDescription>Learn about the Enterprise plan</DialogDescription>
-        </DialogHeader>
+        <DialogClose className="absolute right-3.5 top-3.5 z-10 grid size-8 place-items-center text-muted-foreground transition-colors hover:bg-[#F2F2F1] hover:text-foreground dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2A86FF]">
+          <XIcon className="size-4" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left — Info */}
-          <div className="flex flex-col justify-between w-[300px] shrink-0 px-8 py-12 border-r border-sidebar-border">
-            <div>
-              <h3 className="text-2xl font-bold tracking-tight">Enterprise</h3>
-
-              <div className="mt-5">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold tracking-tight">
-                    Custom
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  starting from 500,000 MAU
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 mt-8">
-              <Button
-                className="w-full h-11 text-sm font-semibold bg-foreground hover:bg-foreground/90 text-background"
-                onClick={handleUpgrade}
-              >
-                Contact Sales
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <a
-                href={`${config.pricingUrl}#calculator`}
-                target="_blank"
-                className="flex items-center justify-center gap-1.5 w-full h-9 rounded-lg text-xs font-medium border border-sidebar-border hover:bg-muted/80 transition-colors"
-              >
-                Compare plans
-                <ArrowRight className="h-3 w-3" />
-              </a>
-              <span className="text-[11px] text-muted-foreground text-center">
-                Custom pricing
-              </span>
-            </div>
-          </div>
-
-          {/* Right — Benefits grid */}
-          <div className="flex-1 bg-muted/30 px-7 py-12 overflow-y-auto flex flex-col">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Enterprise benefits
-            </span>
-            <p className="text-sm text-muted-foreground mt-1.5 mb-5 leading-relaxed">
-              For companies requiring advanced compliance, dedicated support,
-              and custom infrastructure.
+        {/* Left: soft blue surface */}
+        <div className="grain-light flex min-w-0 flex-col p-10 text-[#0B2A57] [background-image:linear-gradient(160deg,#C7DBFA_0%,#DCE8FB_100%)]">
+          <span className="inline-flex h-7 items-center self-start bg-[#1F6FE5] px-2.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white">
+            Enterprise
+          </span>
+          <p className="mt-[26px] text-[40px] font-medium leading-none tracking-[-0.03em]">
+            Custom
+          </p>
+          <p className="mt-3 max-w-[340px] text-[14.5px] leading-[1.55] text-[#3B5579]">
+            A flat yearly licence. Unlimited users, apps and events, and named
+            engineers.
+          </p>
+          <div className="mt-[30px] border-t border-[rgba(11,42,87,0.15)] pt-[26px]">
+            <p className="mb-4 text-[14px] font-medium text-[#3B5579]">
+              Everything in Scale, plus
             </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {benefits.map((item, index) => (
-                <div
-                  key={item.title}
-                  className="flex items-start gap-3 p-3.5 rounded-xl bg-background border border-sidebar-border shadow-[0_1px_3px_0_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_0_rgba(0,0,0,0.08)] transition-shadow animate-fade-up"
-                  style={{ animationDelay: `${index * 50}ms` }}
+            <ul>
+              {FEATURES.map((f) => (
+                <li
+                  key={f}
+                  className="mb-2.5 flex gap-2.5 text-[15px] leading-[1.5]"
                 >
-                  <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-foreground/[0.05] shrink-0">
-                    <item.icon className="h-4 w-4 text-foreground/70" />
-                  </div>
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-[13px] font-semibold leading-tight">
-                      {item.title}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground leading-snug">
-                      {item.desc}
-                    </span>
-                  </div>
-                </div>
+                  <Check />
+                  {f}
+                </li>
               ))}
-            </div>
-            <a
-              href={`${config.pricingUrl}#features`}
-              target="_blank"
-              className="inline-flex items-center gap-1.5 mt-5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            </ul>
+          </div>
+          <div className="mt-auto flex items-center gap-[18px] pt-[34px]">
+            <Button
+              className="h-10 rounded-none bg-[#1F6FE5] px-4 has-[>svg]:px-4 text-[14px] font-medium text-white shadow-none transition-[background-color,transform,box-shadow] duration-200 ease-out hover:bg-[#1A63D2] active:scale-[0.97] focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2A86FF]"
+              onClick={handleUpgrade}
             >
-              See all features
-              <ArrowRight className="h-3 w-3" />
+              Talk to sales
+              <ChevronRight />
+            </Button>
+            <a
+              href={`${config.pricingUrl}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap text-[14px] font-medium text-[#0B2A57] hover:underline underline-offset-4"
+            >
+              Compare plans
+              <ChevronRight className="size-4" />
             </a>
           </div>
+        </div>
+
+        {/* Right: details */}
+        <div className="flex flex-col py-10 pl-10 pr-14 text-foreground">
+          <DialogTitle className="max-w-[420px] text-[24px] font-medium leading-[1.2] tracking-[-0.02em] text-balance">
+            One licence,{" "}
+            <span className="text-[#1F6FE5]">in our cloud or yours.</span>
+          </DialogTitle>
+          <DialogDescription className="mt-3.5 max-w-[440px] text-[16px] leading-[1.6] text-muted-foreground">
+            For apps over 1M monthly active users, teams handling health data,
+            and companies that need grovs inside their own infrastructure.
+          </DialogDescription>
+          <div className="mt-[30px] border-t border-[#E7E5E2] dark:border-border">
+            {ROWS.map((r) => (
+              <div
+                key={r.key}
+                className="grid grid-cols-[132px_1fr] gap-5 border-b border-[#E7E5E2] py-5 dark:border-border"
+              >
+                <span className="pt-[3px] text-[12px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  {r.key}
+                </span>
+                <div>
+                  <h3 className="text-[17px] font-medium tracking-[-0.01em]">
+                    {r.title}
+                  </h3>
+                  <p className="mt-1.5 text-[14.5px] leading-[1.55] text-muted-foreground">
+                    {r.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-auto pt-[26px] text-[13.5px] leading-[1.55] text-muted-foreground">
+            Not sure which you need?{" "}
+            <a
+              href={`${config.salesUrl}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground underline underline-offset-4"
+            >
+              Talk to an engineer
+            </a>{" "}
+            about your setup.
+          </p>
         </div>
       </DialogContent>
     </Dialog>

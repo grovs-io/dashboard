@@ -1,7 +1,12 @@
 import type { AxiosResponse } from "axios";
 import { DELETE, GET, PATCH, POST } from "@/lib/api";
 import { config } from "@/lib/config";
-import type { Link, GetLinksParams, LinksByIdsPayload } from "@/types";
+import type {
+  Link,
+  GetLinksParams,
+  LinksByIdsPayload,
+  LinksLookupParams,
+} from "@/types";
 
 // --- Response types ---
 
@@ -25,6 +30,21 @@ interface UpdateLinkResponse {
 
 interface GetLinksByIdResponse {
   links: Link[];
+}
+
+interface LinksLookupResponse {
+  links: Link[];
+}
+
+export interface LinkLastOpen {
+  opened_at: string;
+  platform: string | null;
+  model: string | null;
+  app_version: string | null;
+}
+
+interface LinkLastOpenResponse {
+  open: LinkLastOpen | null;
 }
 
 interface AvailablePathResponse {
@@ -56,6 +76,22 @@ export const getLinksByIdAPICall = async (
   data: LinksByIdsPayload
 ): Promise<AxiosResponse<GetLinksByIdResponse>> => {
   return POST(config.apiPath + `/projects/${instanceId}/links/by_ids`, data);
+};
+
+export const lookupLinksAPICall = async (
+  instanceId: string,
+  params: LinksLookupParams = {},
+  signal?: AbortSignal
+): Promise<AxiosResponse<LinksLookupResponse>> => {
+  const qs = new URLSearchParams();
+  if (params.term) qs.set("term", params.term);
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return GET(
+    config.apiPath +
+      `/projects/${instanceId}/links/lookup${query ? `?${query}` : ""}`,
+    { signal }
+  );
 };
 
 export const updateLinkAPICall = async (
@@ -93,4 +129,14 @@ export const getRandomPathAPICall = async (
   instanceId: string
 ): Promise<AxiosResponse<RandomPathResponse>> => {
   return GET(config.apiPath + `/projects/${instanceId}/links/random_path`);
+};
+
+export const getLinkLastOpenAPICall = async (
+  projectId: string,
+  linkId: string
+): Promise<AxiosResponse<LinkLastOpenResponse>> => {
+  return GET(
+    config.apiPath + `/projects/${projectId}/links/${linkId}/last_open`,
+    { maxRetries: 0 }
+  );
 };

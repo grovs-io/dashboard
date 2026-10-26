@@ -1,7 +1,9 @@
 import { Input } from "../ui/input";
-import { Copy } from "lucide-react";
+import { BellOff, BellRing, Copy } from "lucide-react";
 import { handleCopyText } from "@/lib/copyTextHelper";
-import type { Visitor } from "@/types";
+import { PlatformIcon } from "@/components/analytics/shared";
+import { cn } from "@/lib/utils";
+import type { Visitor, VisitorPushStatus } from "@/types";
 
 interface KeyValuePair {
   key: string;
@@ -11,11 +13,13 @@ interface KeyValuePair {
 const AudienceDetailsAttributes = ({
   visitorInfo,
   dataTable,
+  push,
 }: {
   visitorInfo: Visitor | null;
   columns?: unknown;
   table?: unknown;
   dataTable: KeyValuePair[];
+  push?: VisitorPushStatus | null;
 }) => {
   return (
     <div className="flex flex-col gap-6">
@@ -39,6 +43,7 @@ const AudienceDetailsAttributes = ({
             value={visitorInfo.sdk_identifier}
           />
         )}
+        {push && <PushStatusField push={push} />}
       </div>
 
       {dataTable.length > 0 && (
@@ -77,6 +82,70 @@ const AudienceDetailsAttributes = ({
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const PUSH_PLATFORMS: Record<string, string> = {
+  ios: "iOS",
+  android: "Android",
+};
+
+const PushStatusField = ({ push }: { push: VisitorPushStatus }) => {
+  const label = push.platform ? PUSH_PLATFORMS[push.platform] : undefined;
+  const state = !label
+    ? {
+        badge: "Not available",
+        pill: "bg-muted text-muted-foreground",
+        icon: "bg-muted text-muted-foreground",
+        note: "Push reaches iOS and Android devices only.",
+      }
+    : push.registered
+      ? {
+          badge: "Registered",
+          pill: "bg-valid-green/10 text-valid-green",
+          icon: "bg-valid-green/10 text-valid-green",
+          note: `This ${label} device can receive pushes.`,
+        }
+      : {
+          badge: "Not registered",
+          pill: "bg-muted text-muted-foreground",
+          icon: "bg-muted text-muted-foreground",
+          note: `The app hasn't registered this ${label} device yet.`,
+        };
+  const Icon = push.registered && label ? BellRing : BellOff;
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-sidebar-border p-3">
+      <span
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-full",
+          state.icon
+        )}
+      >
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-sm font-medium">
+          <span>Push notifications</span>
+          {push.platform && (
+            <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
+              <span aria-hidden="true">·</span>
+              <PlatformIcon platform={push.platform} alt="" size={11} />
+              <span>{label ?? push.platform}</span>
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground">{state.note}</div>
+      </div>
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+          state.pill
+        )}
+      >
+        <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+        {state.badge}
+      </span>
     </div>
   );
 };

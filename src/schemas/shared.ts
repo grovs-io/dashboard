@@ -44,3 +44,12 @@ export const shaSchema = z.string().refine(
   },
   { message: "Invalid SHA format" }
 );
+
+export const httpsUrlSchema = z
+  .string()
+  .refine(
+    (url) =>
+      url.startsWith("https://") &&
+      isURL(url, { require_protocol: true, protocols: ["https"] }),
+    { message: "Enter a valid URL starting with https://" }
+  );

@@ -44,18 +44,6 @@ class LocalStorage {
     return localStorage.getItem("login_type");
   };
 
-  static setCraftPreview = (type: string): void => {
-    localStorage.setItem("craft-preview-data", type);
-  };
-
-  static removeCraftPreview = (): void => {
-    localStorage.removeItem("craft-preview-data");
-  };
-
-  static getCraftPreview = (): string | null => {
-    return localStorage.getItem("craft-preview-data");
-  };
-
   static setDashboardCards = (cards: string[]): void => {
     localStorage.setItem("dashboard_cards", cards.join(","));
   };

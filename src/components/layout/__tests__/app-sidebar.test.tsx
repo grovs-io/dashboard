@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 const accessState = { allowed: false };
-const routeState = { pathname: "/settings" };
+const routeState = { pathname: "/settings/team" };
 
 vi.mock("next/navigation", () => ({
   usePathname: () => routeState.pathname,
@@ -24,11 +24,11 @@ vi.mock("@ee/hooks/queries/useAuditQueries", () => ({
 vi.mock("@/components/layout/team-switcher", () => ({
   ProjectSwitcher: () => <div>switcher</div>,
 }));
+vi.mock("@/components/layout/SetupSidebarEntry", () => ({
+  SetupSidebarEntry: () => null,
+}));
 vi.mock("@/components/layout/nav-user", () => ({
   NavUser: () => <div>user</div>,
-}));
-vi.mock("@/components/layout/nav-support", () => ({
-  NavSupport: () => <div>support</div>,
 }));
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
@@ -41,11 +41,11 @@ const renderSidebar = () =>
     </SidebarProvider>
   );
 
-describe("AppSidebar audit logs entry", () => {
+describe("AppSidebar settings section", () => {
   beforeEach(() => {
     accessState.allowed = false;
-    // Inside the Settings section, so the collapsible renders its children.
-    routeState.pathname = "/settings";
+    routeState.pathname = "/settings/team";
+    localStorage.clear();
     // jsdom has no matchMedia; ui/sidebar's mobile check needs it.
     vi.stubGlobal(
       "matchMedia",
@@ -57,35 +57,48 @@ describe("AppSidebar audit logs entry", () => {
     );
   });
 
-  it("shows Audit Logs beside Settings for an entitled admin", () => {
-    accessState.allowed = true;
+  it("keeps the main sections alongside settings", () => {
     renderSidebar();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
-    expect(screen.getByText("Audit Logs")).toBeInTheDocument();
+    for (const group of ["Audience", "Developers"])
+      fireEvent.click(screen.getByText(group).closest("button")!);
+    expect(screen.getByText("Visitors")).toBeInTheDocument();
+    expect(screen.getByText("Team").closest("a")).toHaveAttribute(
+      "href",
+      "/settings/team"
+    );
+    expect(screen.getByText("Developers")).toBeInTheDocument();
+    expect(screen.getByText("API Key").closest("a")).toHaveAttribute(
+      "href",
+      "/settings/developers/access_key"
+    );
+    expect(screen.getByText("SDK Setup")).toBeInTheDocument();
   });
 
-  it("hides Audit Logs when access is not allowed", () => {
+  it("shows the developer pages when inside them", () => {
+    routeState.pathname = "/settings/developers/ios_setup";
     renderSidebar();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
-    expect(screen.queryByText("Audit Logs")).not.toBeInTheDocument();
+    expect(screen.getByText("iOS").closest("a")).toHaveAttribute(
+      "data-active",
+      "true"
+    );
+    expect(screen.getByText("API Key").closest("a")).toHaveAttribute(
+      "data-active",
+      "false"
+    );
+    expect(screen.queryByText("Team")).not.toBeInTheDocument();
   });
 
-  it("links Audit Logs to its own top-level route", () => {
+  it("shows Audit Logs for an entitled admin", () => {
     accessState.allowed = true;
     renderSidebar();
     expect(screen.getByText("Audit Logs").closest("a")).toHaveAttribute(
       "href",
-      "/audit_logs"
+      "/settings/audit_logs"
     );
   });
 
-  it("leaves Settings a plain item, not a section", () => {
-    accessState.allowed = true;
+  it("hides Audit Logs when access is not allowed", () => {
     renderSidebar();
-    expect(screen.getByText("Settings").closest("a")).toHaveAttribute(
-      "href",
-      "/settings"
-    );
-    expect(screen.queryByText("General")).not.toBeInTheDocument();
+    expect(screen.queryByText("Audit Logs")).not.toBeInTheDocument();
   });
 });

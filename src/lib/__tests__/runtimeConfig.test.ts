@@ -35,4 +35,28 @@ describe("runtime dashboard configuration", () => {
       })
     ).toContain("connect-src 'self' https://api.customer.example");
   });
+
+  it("lets the in-app preview, served by the API, be framed", async () => {
+    const { buildContentSecurityPolicy } =
+      await import("@/lib/contentSecurityPolicy");
+
+    expect(
+      buildContentSecurityPolicy({
+        apiUrl: "https://api.customer.example/api",
+      })
+    ).toContain("frame-src 'self' https://api.customer.example");
+  });
+
+  it("lets uploaded videos and audio load like images", async () => {
+    const { buildContentSecurityPolicy } =
+      await import("@/lib/contentSecurityPolicy");
+
+    expect(
+      buildContentSecurityPolicy({
+        apiUrl: "https://api.customer.example/api",
+      })
+    ).toContain(
+      "media-src 'self' data: blob: https: https://api.customer.example"
+    );
+  });
 });

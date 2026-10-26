@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "description": "SaaS dashboard for mobile app growth — deep links, messaging campaigns, revenue tracking, and audience analytics",
   "author": "appssemble",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/grovs-io/dashboard.git"
@@ -30,7 +30,12 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@craftjs/core": "^0.2.12",
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -55,10 +60,12 @@
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
+    "@stripe/react-stripe-js": "^7.0.0",
+    "@stripe/stripe-js": "^10.1.0",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@tanstack/react-table": "^8.21.3",
-    "axios": "^1.10.0",
+    "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -66,23 +73,24 @@
     "date-fns": "^4.1.0",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.525.0",
-    "next": "^16.2.0",
+    "next": "^16.4.3",
     "next-themes": "^0.4.6",
     "posthog-js": "^1.337.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.3",
     "react-day-picker": "^9.8.1",
     "react-dom": "^19.2.3",
     "react-hook-form": "^7.71.2",
     "react-password-checklist": "^1.8.1",
     "recharts": "^3.0.2",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "validator": "^13.15.15",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^16.2.0",
+    "@next/bundle-analyzer": "^16.4.3",
     "@playwright/test": "^1.58.2",
     "@shikijs/transformers": "^3.9.2",
     "@tailwindcss/postcss": "^4",
@@ -121,6 +129,14 @@
     ]
   },
   "overrides": {
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.5",
+    "dompurify": "^3.4.17",
+    "follow-redirects": "^1.16.2",
+    "source-map-js": "^1.2.2",
+    "undici": "^7.30.1",
+    "vite": "^8.3.5",
+    "fflate": "^0.4.9",
+    "@humanfs/node": "^0.16.8",
+    "eslint-plugin-react-hooks": "7.0.1"
   }
 }

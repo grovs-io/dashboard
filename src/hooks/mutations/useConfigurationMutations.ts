@@ -29,12 +29,16 @@ export function useSetDefaultRedirectMutation(projectId: string | undefined) {
       showIosPreview,
       copyToClipboardAndroid,
       copyToClipboardIos,
+      inAppBrowserPageAndroid,
+      inAppBrowserPageIos,
     }: {
       defaultFallback: string;
       showAndroidPreview: boolean;
       showIosPreview: boolean;
       copyToClipboardAndroid: boolean;
       copyToClipboardIos: boolean;
+      inAppBrowserPageAndroid: boolean;
+      inAppBrowserPageIos: boolean;
     }) => {
       if (!projectId) return Promise.reject(new Error("No project selected"));
       return setDefaultRedirectAPICall(
@@ -43,7 +47,9 @@ export function useSetDefaultRedirectMutation(projectId: string | undefined) {
         showAndroidPreview,
         showIosPreview,
         copyToClipboardAndroid,
-        copyToClipboardIos
+        copyToClipboardIos,
+        inAppBrowserPageAndroid,
+        inAppBrowserPageIos
       );
     },
     onSuccess: () => {

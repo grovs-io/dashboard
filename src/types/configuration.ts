@@ -19,6 +19,9 @@ export interface RedirectConfig {
   // Absent on backends that predate clipboard matching.
   copy_to_clipboard_android?: boolean;
   copy_to_clipboard_ios?: boolean;
+  // Absent on backends that predate in-app browser handling.
+  in_app_browser_page_android?: boolean;
+  in_app_browser_page_ios?: boolean;
   ios?: RedirectPlatformConfig;
   android?: RedirectPlatformConfig;
   desktop?: RedirectPlatformConfig;

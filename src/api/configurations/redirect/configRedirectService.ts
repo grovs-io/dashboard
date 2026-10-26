@@ -41,7 +41,9 @@ export const setDefaultRedirectAPICall = async (
   showAndroidPreview: boolean,
   showIosPreview: boolean,
   copyToClipboardAndroid: boolean,
-  copyToClipboardIos: boolean
+  copyToClipboardIos: boolean,
+  inAppBrowserPageAndroid: boolean,
+  inAppBrowserPageIos: boolean
 ): Promise<AxiosResponse<RedirectConfigResponse>> => {
   const data = {
     default_fallback: default_fallback,
@@ -49,6 +51,8 @@ export const setDefaultRedirectAPICall = async (
     show_preview_ios: showIosPreview,
     copy_to_clipboard_android: copyToClipboardAndroid,
     copy_to_clipboard_ios: copyToClipboardIos,
+    in_app_browser_page_android: inAppBrowserPageAndroid,
+    in_app_browser_page_ios: inAppBrowserPageIos,
   };
 
   return PUT(config.apiPath + `/projects/${projectId}/redirect_config`, data);

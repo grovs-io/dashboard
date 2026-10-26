@@ -28,9 +28,17 @@ vi.mock("@/hooks/queries/useConfigurationQueries", () => ({
   useCustomDomainsEnvelopeQuery: vi.fn(),
 }));
 
-vi.mock("@/lib/edition", () => ({
+const edition = vi.hoisted(() => ({
   IS_ENTERPRISE: false,
   IS_SELF_HOSTED: true,
+}));
+vi.mock("@/lib/edition", () => ({
+  get IS_ENTERPRISE() {
+    return edition.IS_ENTERPRISE;
+  },
+  get IS_SELF_HOSTED() {
+    return edition.IS_SELF_HOSTED;
+  },
 }));
 
 vi.mock("@/hooks/queries/useMigrationQueries", () => ({
@@ -167,6 +175,7 @@ function setPreflight(cnameMatches: boolean | null = null) {
 
 describe("MigrationEntry", () => {
   beforeEach(() => {
+    edition.IS_SELF_HOSTED = true;
     vi.clearAllMocks();
     setDomains();
     setSource();
@@ -221,7 +230,51 @@ describe("MigrationEntry", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps the wizard open while an errored source query refetches", () => {
+    // Wizard mount refetches an errored source query, flipping it to pending.
+    setSource({ isError: true, error: new ApiError("Forbidden", 403) });
+    const client = new QueryClient();
+    const ui = () => (
+      <QueryClientProvider client={client}>
+        <MigrationEntry projectId={PROJECT_ID} />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(ui());
+    fireEvent.click(
+      screen.getByRole("button", { name: /migrate from another platform/i })
+    );
+    const wizard = screen.getByTestId("migration-wizard-stub");
+
+    mockedSource.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
+    rerender(ui());
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("migration-wizard-stub")).toBe(wizard);
+  });
+
+  it("self-hosted opens the wizard without a subscription (no billing there)", () => {
+    mockedSubscription.mockReturnValue({
+      data: { subscription: null },
+      isLoading: false,
+    } as never);
+
+    renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /migrate from another platform/i })
+    );
+
+    expect(screen.getByTestId("migration-wizard-stub")).toBeInTheDocument();
+    expect(screen.queryByText(/migration requires a paid plan/i)).toBeNull();
+  });
+
   it("shows a paid-plan upsell instead of the wizard without a subscription", () => {
+    edition.IS_SELF_HOSTED = false;
     mockedSubscription.mockReturnValue({
       data: { subscription: null },
       isLoading: false,
@@ -238,7 +291,32 @@ describe("MigrationEntry", () => {
     expect(screen.queryByTestId("migration-wizard-stub")).toBeNull();
   });
 
+  it("shows a paid-plan upsell instead of the wizard with a payment issue", () => {
+    edition.IS_SELF_HOSTED = false;
+    mockedSubscription.mockReturnValue({
+      data: {
+        subscription: {
+          type: "stripe",
+          payment_issue: true,
+          status: "past_due",
+        },
+      },
+      isLoading: false,
+    } as never);
+
+    renderWithClient(<MigrationEntry projectId={PROJECT_ID} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /migrate from another platform/i })
+    );
+
+    expect(
+      screen.getByText(/migration requires a paid plan/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("migration-wizard-stub")).toBeNull();
+  });
+
   it("opens the scale-up dialog from the upsell", () => {
+    edition.IS_SELF_HOSTED = false;
     mockedSubscription.mockReturnValue({
       data: { subscription: null },
       isLoading: false,

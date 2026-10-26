@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -32,6 +33,12 @@ import {
 } from "@/hooks/queries/usePaymentsQueries";
 import { config } from "@/lib/config";
 import { IS_SELF_HOSTED } from "@/lib/edition";
+import {
+  navTrail,
+  withNavQuery,
+  type crumb,
+} from "@/components/layout/navConfig";
+import { ChatButton } from "@/components/layout/chat-button";
 
 type AppHeaderProps = {
   titleOverride?: string;
@@ -58,13 +65,24 @@ export default function AppHeader({
   const mau = mauQuery.data ?? { current_quantity: 0, total_available: 1 };
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const query = searchParams.toString();
 
   // Automatically build breadcrumbs from URL
   const breadcrumbLabelOverrides: Record<string, string> = {
+    dashboard: "Home",
+    access_key: "API Key",
+    event_stream: "Data Export",
     ios_setup: "iOS Setup",
     android_setup: "Android Setup",
     web_setup: "Web Setup",
+    in_app: "In-App",
+  };
+
+  // Roots whose child routes use hashids, so the numeric-id rule above never links them.
+  const linkableRoots: Record<string, true> = {
+    segments: true,
+    push: true,
+    in_app: true,
+    journeys: true,
   };
 
   const pathSegments = pathname
@@ -75,11 +93,54 @@ export default function AppHeader({
       label: breadcrumbLabelOverrides[slug] ?? slug.replace(/_/g, " "), // display label
     }));
 
+  const withQuery = (href: string) => withNavQuery(href, searchParams);
+
+  // Breadcrumbs follow the sidebar (Section › page), so they match the nav
+  // rather than the URL; deeper detail routes add crumbs after the page.
+  type headerCrumb = crumb & { capitalize?: boolean };
+  const crumbs: headerCrumb[] = (() => {
+    const nav = navTrail(pathname);
+    if (!nav) {
+      // Not in the sidebar: fall back to URL segments.
+      const lastSlug = pathSegments[pathSegments.length - 1]?.slug ?? "";
+      return pathSegments.map((segment, idx) => {
+        const isLast = idx === pathSegments.length - 1;
+        const shouldLink =
+          (idx === pathSegments.length - 2 && /^[0-9]/.test(lastSlug)) ||
+          (!isLast && idx === 0 && segment.slug in linkableRoots);
+        const href =
+          "/" +
+          pathSegments
+            .slice(0, idx + 1)
+            .map((s) => s.slug)
+            .join("/");
+        return {
+          label: segment.label,
+          href: shouldLink ? href : undefined,
+          capitalize: !(segment.slug in breadcrumbLabelOverrides),
+        };
+      });
+    }
+    const extra = pathSegments.slice(
+      nav.matchedUrl.split("/").filter(Boolean).length
+    );
+    return [
+      ...nav.trail,
+      ...extra.map((segment) => ({
+        label: segment.label,
+        capitalize: !(segment.slug in breadcrumbLabelOverrides),
+      })),
+    ];
+  })();
+  if (titleOverride && crumbs.length) {
+    crumbs[crumbs.length - 1] = {
+      ...crumbs[crumbs.length - 1],
+      label: titleOverride,
+      capitalize: false,
+    };
+  }
+
   const router = useRouter();
-  const returnUrlWithParams = (url: string) => {
-    const urlWithParams = `${url}${query ? `?${query}` : ""}`;
-    return urlWithParams;
-  };
 
   const getCurrentMauValue = () => {
     if (isEnterprise) {
@@ -106,7 +167,7 @@ export default function AppHeader({
       return;
     }
     // Paid Stripe subscribers — don't show the banner (Stripe handles billing)
-    if (subscription && !isEnterprise) {
+    if (subscription && !isEnterprise && !subscription.payment_issue) {
       return;
     }
     // Enterprise accounts — show a contact-sales banner only if over limit
@@ -140,7 +201,7 @@ export default function AppHeader({
         <div
           className="w-full bg-destructive-secondary dark:bg-destructive p-2 flex items-center justify-center cursor-pointer"
           onClick={() => {
-            router.replace(returnUrlWithParams("/settings"));
+            router.replace(withQuery("/settings/usage"));
           }}
         >
           <p className="text-sm text-destructive text-center dark:text-foreground">
@@ -181,47 +242,27 @@ export default function AppHeader({
         <div className="flex-1 flex items-center overflow-x-auto">
           <Breadcrumb className="flex items-center">
             <BreadcrumbList>
-              {pathSegments.map((segment, idx) => {
-                const { label } = segment;
-                const href =
-                  "/" +
-                  pathSegments
-                    .slice(0, idx + 1)
-                    .map((s) => s.slug)
-                    .join("/");
-                const isLast = idx === pathSegments.length - 1;
-                const isSecondLast = idx === pathSegments.length - 2;
-
-                const lastSegment =
-                  pathSegments[pathSegments.length - 1]?.slug ?? "";
-                const shouldLink = isSecondLast && /^[0-9]/.test(lastSegment);
-
-                const currentSearch = searchParams.toString();
-                const hrefWithParams = currentSearch
-                  ? `${href}/?${currentSearch}`
-                  : `${href}/`;
-
-                const hasOverride = segment.slug in breadcrumbLabelOverrides;
-                const computedLabel = label;
-
-                const displayLabel =
-                  isLast && titleOverride ? titleOverride : computedLabel;
-
+              {crumbs.map((c, idx) => {
+                const isLast = idx === crumbs.length - 1;
                 return (
-                  <React.Fragment key={href}>
+                  <React.Fragment key={`${idx}-${c.label}`}>
                     <BreadcrumbItem>
-                      {shouldLink ? (
+                      {c.href && !isLast ? (
+                        // A plain anchor reloads the page, which forgets the selected project.
                         <BreadcrumbLink
-                          href={hrefWithParams}
-                          className={hasOverride ? undefined : "capitalize"}
+                          asChild
+                          className={c.capitalize ? "capitalize" : undefined}
                         >
-                          {displayLabel}
+                          <Link href={withQuery(c.href)}>{c.label}</Link>
                         </BreadcrumbLink>
                       ) : (
                         <BreadcrumbPage
-                          className={hasOverride ? undefined : "capitalize"}
+                          className={cn(
+                            c.capitalize && "capitalize",
+                            !isLast && "text-muted-foreground font-normal"
+                          )}
                         >
-                          {displayLabel}
+                          {c.label}
                         </BreadcrumbPage>
                       )}
                     </BreadcrumbItem>
@@ -233,7 +274,8 @@ export default function AppHeader({
           </Breadcrumb>
         </div>
 
-        <div className="flex items-center gap-4 ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
+          <ChatButton />
           {!hideEnvSelect && (
             <Select
               value={projectType}

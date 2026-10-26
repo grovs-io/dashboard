@@ -10,6 +10,7 @@ describe("redirectRulesSchema", () => {
       customUrl: "",
       showPreview: false,
       copyToClipboard: false,
+      inAppBrowserPage: false,
     },
     ios: {
       enabled: true,
@@ -17,6 +18,7 @@ describe("redirectRulesSchema", () => {
       customUrl: "",
       showPreview: false,
       copyToClipboard: false,
+      inAppBrowserPage: false,
     },
     desktop: {
       generatedPage: true,
@@ -49,6 +51,7 @@ describe("redirectRulesSchema", () => {
         customUrl: "",
         showPreview: false,
         copyToClipboard: false,
+        inAppBrowserPage: false,
       },
       ios: {
         enabled: false,
@@ -56,6 +59,7 @@ describe("redirectRulesSchema", () => {
         customUrl: "",
         showPreview: false,
         copyToClipboard: false,
+        inAppBrowserPage: false,
       },
       desktop: { generatedPage: true, customUrl: "" },
     });

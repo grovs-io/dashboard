@@ -87,12 +87,13 @@ const defaultEventsDateRange = (() => {
 })();
 
 function rangeExceedsEventsWindow(
-  range: { from?: Date; to?: Date } | undefined
+  range: { from?: Date; to?: Date } | undefined,
+  maxDays: number
 ): boolean {
   if (!range?.from || !range?.to) return false;
   return (
     differenceInCalendarDays(startOfDay(range.to), startOfDay(range.from)) + 1 >
-    VOLUME_MAX_DAYS
+    maxDays
   );
 }
 
@@ -156,7 +157,8 @@ export default function EventsExplorer() {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("events_show_graph") !== "false";
   });
-  const rangeTooLarge = rangeExceedsEventsWindow(dateRange);
+  const rawMaxDays = retention?.raw_max_days ?? VOLUME_MAX_DAYS;
+  const rangeTooLarge = rangeExceedsEventsWindow(dateRange, rawMaxDays);
   const rangeOrderInvalid = rangeHasInvalidOrder(dateRange);
 
   // Build API params from URL-backed state
@@ -504,7 +506,7 @@ export default function EventsExplorer() {
         <AnalyticsNotice
           variant="warning"
           title="Date range is too large"
-          description={`Events can query at most ${VOLUME_MAX_DAYS} days at a time. Choose Last 3 months or a shorter custom range to load the table and timeline.`}
+          description={`Events can query at most ${rawMaxDays} days at a time. Choose a shorter range to load the table and timeline.`}
         />
       )}
 
@@ -553,7 +555,7 @@ export default function EventsExplorer() {
       ) : rangeTooLarge ? (
         <div className="flex min-h-[220px] flex-1 items-center justify-center rounded-xl border border-sidebar-border bg-background px-4 text-center">
           <p className="max-w-md text-sm text-muted-foreground">
-            Select a date range up to {VOLUME_MAX_DAYS} days to load events.
+            Select a date range up to {rawMaxDays} days to load events.
           </p>
         </div>
       ) : !tableLoading && tableData.length === 0 && !hasFilters ? (
@@ -563,7 +565,7 @@ export default function EventsExplorer() {
             title="No events recorded yet"
             description="Browse every event your app sends in real time — screen views, taps, purchases, and custom events. Integrate the Grovs SDK to start collecting data."
             sdkDescription="No events have been recorded in this time range. Events will appear here as users interact with your app."
-            linkHref="/developers"
+            linkHref="/settings/developers"
             linkLabel="Set up the SDK"
           />
         </div>
@@ -589,7 +591,7 @@ export default function EventsExplorer() {
                 title="No events recorded yet"
                 description="Browse every event your app sends in real time — screen views, taps, purchases, and custom events. Integrate the Grovs SDK to start collecting data."
                 sdkDescription="No events have been recorded in this time range. Events will appear here as users interact with your app."
-                linkHref="/developers"
+                linkHref="/settings/developers"
                 linkLabel="Set up the SDK"
               />
             }

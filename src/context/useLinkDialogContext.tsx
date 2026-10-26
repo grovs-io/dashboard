@@ -69,7 +69,7 @@ import { getLinksByIdAPICall } from "@/api/links/linksService";
 type DialogOptions = {
   onConfirm?: (...args: unknown[]) => Promise<void> | void;
   campaignID?: string;
-  onSuccess?: () => void;
+  onSuccess?: (link?: Link) => void;
 };
 
 type LinkDialogContextType = {
@@ -311,7 +311,7 @@ const LinkDialogProvider = ({ children }: { children: ReactNode }) => {
         queryKey: queryKeys.projects.detail(projectId!),
       });
       trackEvent(EVENTS.LINK_CREATED, { linkId: link.id });
-      options?.onSuccess?.();
+      options?.onSuccess?.(link);
     } catch (error) {
       showErrorNotification(
         error instanceof ApiError

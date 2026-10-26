@@ -1,12 +1,16 @@
 import { DELETE, GET, POST } from "@/lib/api";
 import type { AxiosResponse } from "axios";
 import { config } from "@/lib/config";
-import type { Subscription, MAU } from "@/types";
+import type { Subscription, MAU, PlanChoice } from "@/types";
 
 // --- Response interfaces ---
 
 export interface StripeUrlResponse {
   url: string;
+}
+
+export interface CheckoutSessionResponse {
+  client_secret: string;
 }
 
 export const getSubscriptionDetailsAPICall = async (
@@ -34,15 +38,12 @@ export const getCurrentUsageAPICall = async (
 };
 
 export const createSubscriptionAPICall = async (
-  instanceId: string
-): Promise<AxiosResponse<StripeUrlResponse>> => {
-  const data = {
-    id: instanceId,
-  };
-
+  instanceId: string,
+  choice: PlanChoice
+): Promise<AxiosResponse<CheckoutSessionResponse>> => {
   return POST(
     config.apiPath + `/instances/${instanceId}/billing/subscriptions`,
-    data
+    choice
   );
 };
 
@@ -51,5 +52,13 @@ export const cancelSubscriptionAPICall = async (
 ): Promise<AxiosResponse> => {
   return DELETE(
     config.apiPath + `/instances/${instanceId}/billing/subscription`
+  );
+};
+
+export const resumeSubscriptionAPICall = async (
+  instanceId: string
+): Promise<AxiosResponse<{ result: boolean }>> => {
+  return POST(
+    config.apiPath + `/instances/${instanceId}/billing/subscription/resume`
   );
 };

@@ -8,7 +8,8 @@ import type {
 
 export function useRetentionSummaryQuery(
   projectId: string | undefined,
-  params?: AnalyticsRetentionSummaryParams
+  params?: AnalyticsRetentionSummaryParams,
+  enabled = true
 ) {
   return useQuery<RetentionSummaryResponse>({
     queryKey: queryKeys.projects.analyticsRetentionSummary(projectId!, params),
@@ -16,6 +17,6 @@ export function useRetentionSummaryQuery(
       const response = await getRetentionSummaryAPICall(projectId!, params);
       return response.data;
     },
-    enabled: !!projectId,
+    enabled: !!projectId && enabled,
   });
 }

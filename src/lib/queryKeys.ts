@@ -3,7 +3,6 @@ import type {
   GetCampaignsParams,
   DateRangeQuery,
   GetRevenueParams,
-  GetMessagingParams,
   GetVisitorsParams,
   AnalyticsEventsParams,
   AnalyticsEventVolumeParams,
@@ -13,15 +12,22 @@ import type {
   OverviewKeyMetricSeriesParams,
   AnalyticsRetentionSummaryParams,
   AuditEventFilters,
+  GetSegmentsParams,
+  MetricQueryParams,
 } from "@/types";
 import type {
   EventsSearchPayload,
   EventsSortedPayload,
   LinksByIdsPayload,
+  LinksLookupParams,
 } from "@/types";
 
 export const queryKeys = {
   projects: {
+    eventDestinations: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "eventDestinations"] as const,
+    eventStreamTokens: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "eventStreamTokens"] as const,
     all: ["projects"] as const,
     detail: (projectId: string) =>
       [...queryKeys.projects.all, projectId] as const,
@@ -29,6 +35,14 @@ export const queryKeys = {
       [...queryKeys.projects.detail(projectId), "links", params] as const,
     linksByIds: (projectId: string, ids: LinksByIdsPayload) =>
       [...queryKeys.projects.detail(projectId), "linksByIds", ids] as const,
+    linksLookup: (projectId: string, params: LinksLookupParams) =>
+      [...queryKeys.projects.detail(projectId), "linksLookup", params] as const,
+    linkLastOpen: (projectId: string, linkId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "linkLastOpen",
+        linkId,
+      ] as const,
     pathAvailable: (projectId: string, path: string) =>
       [...queryKeys.projects.detail(projectId), "pathAvailable", path] as const,
     randomPath: (projectId: string) =>
@@ -57,12 +71,6 @@ export const queryKeys = {
       [
         ...queryKeys.projects.detail(projectId),
         "revenueMetrics",
-        params,
-      ] as const,
-    notifications: (projectId: string, params?: GetMessagingParams) =>
-      [
-        ...queryKeys.projects.detail(projectId),
-        "notifications",
         params,
       ] as const,
     events: (projectId: string, params?: EventsSearchPayload) =>
@@ -101,10 +109,171 @@ export const queryKeys = {
         "visitorDetails",
         visitorId,
       ] as const,
+    segments: (projectId: string, params?: GetSegmentsParams) =>
+      [...queryKeys.projects.detail(projectId), "segments", params] as const,
+    segment: (projectId: string, segmentId: string) =>
+      [...queryKeys.projects.detail(projectId), "segment", segmentId] as const,
+    segmentCatalogue: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "segmentCatalogue"] as const,
+    segmentCount: (projectId: string, segmentId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "segmentCount",
+        segmentId,
+      ] as const,
+    segmentSizeHistory: (projectId: string, segmentId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "segmentSizeHistory",
+        segmentId,
+      ] as const,
+    segmentBreakdown: (
+      projectId: string,
+      segmentId: string,
+      by: string,
+      resultId?: string
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "segmentBreakdown",
+        segmentId,
+        by,
+        resultId,
+      ] as const,
+    segmentIdentifierListAll: (projectId: string, segmentId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "segmentIdentifierList",
+        segmentId,
+      ] as const,
+    segmentIdentifierList: (projectId: string, segmentId: string, q: string) =>
+      [
+        ...queryKeys.projects.segmentIdentifierListAll(projectId, segmentId),
+        q,
+      ] as const,
+    segmentMembersAll: (projectId: string, segmentId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "segmentMembers",
+        segmentId,
+      ] as const,
+    segmentMembers: (
+      projectId: string,
+      segmentId: string,
+      resultId?: string,
+      q?: string
+    ) =>
+      [
+        ...queryKeys.projects.segmentMembersAll(projectId, segmentId),
+        resultId ?? null,
+        q ?? "",
+      ] as const,
+    segmentBreakdownAll: (projectId: string, segmentId: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "segmentBreakdown",
+        segmentId,
+      ] as const,
+    segmentExports: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "segmentExports"] as const,
+    pushCampaigns: (projectId: string, params?: { status?: string }) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "pushCampaigns",
+        params,
+      ] as const,
+    pushCampaign: (projectId: string, id: string) =>
+      [...queryKeys.projects.detail(projectId), "pushCampaign", id] as const,
+    pushDeliveries: (projectId: string, id: string, status?: string) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "pushDeliveries",
+        id,
+        status ?? null,
+      ] as const,
+    pushExperiment: (projectId: string, id: string) =>
+      [...queryKeys.projects.detail(projectId), "pushExperiment", id] as const,
+    pushDeliveriesAll: (projectId: string, id: string) =>
+      [...queryKeys.projects.detail(projectId), "pushDeliveries", id] as const,
+    inAppCampaigns: (projectId: string, params?: { status?: string }) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "inAppCampaigns",
+        params ?? {},
+      ] as const,
+    inAppCampaign: (projectId: string, id: string) =>
+      [...queryKeys.projects.detail(projectId), "inAppCampaign", id] as const,
+    inAppReport: (
+      projectId: string,
+      id: string,
+      params: { from: string; to: string; by: string }
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "inAppReport",
+        id,
+        params,
+      ] as const,
+    inAppExperiment: (
+      projectId: string,
+      id: string,
+      params: { from: string; to: string }
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "inAppExperiment",
+        id,
+        params,
+      ] as const,
+    inAppComments: (
+      projectId: string,
+      id: string,
+      params: { from: string; to: string; values?: string }
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "inAppComments",
+        id,
+        params,
+      ] as const,
+    inAppSettings: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "inAppSettings"] as const,
+    journeys: (projectId: string, params?: { status?: string }) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "journeys",
+        params ?? {},
+      ] as const,
+    journey: (projectId: string, id: string) =>
+      [...queryKeys.projects.detail(projectId), "journey", id] as const,
+    journeyReport: (
+      projectId: string,
+      id: string,
+      params: { from: string; to: string }
+    ) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "journeyReport",
+        id,
+        params,
+      ] as const,
+    // Outside the detail prefix: a draft save must not re-run the estimate.
+    pushAudienceEstimate: (projectId: string, audience: string) =>
+      ["pushAudienceEstimate", projectId, audience] as const,
     redirectConfig: (projectId: string) =>
       [...queryKeys.projects.detail(projectId), "redirectConfig"] as const,
     domainConfig: (projectId: string) =>
       [...queryKeys.projects.detail(projectId), "domainConfig"] as const,
+    smartBanners: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "smartBanners"] as const,
+    smartBannersStatus: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "smartBannersStatus"] as const,
+    smartBanner: (projectId: string, bannerId: number) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "smartBanner",
+        bannerId,
+      ] as const,
     domainDefaults: (projectId: string) =>
       [...queryKeys.projects.detail(projectId), "domainDefaults"] as const,
     customDomain: (projectId: string) =>
@@ -236,6 +405,18 @@ export const queryKeys = {
         "analyticsRetentionSummary",
         params,
       ] as const,
+
+    analyticsMetricQuery: (projectId: string, params?: MetricQueryParams) =>
+      [
+        ...queryKeys.projects.detail(projectId),
+        "analyticsMetricQuery",
+        params,
+      ] as const,
+
+    dashboards: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "dashboards"] as const,
+    sdkStatus: (projectId: string) =>
+      [...queryKeys.projects.detail(projectId), "sdkStatus"] as const,
   },
 
   instances: {
@@ -287,5 +468,9 @@ export const queryKeys = {
 
   mcp: {
     tokens: ["mcp", "tokens"] as const,
+  },
+
+  sdkReleases: {
+    android: ["sdkReleases", "android"] as const,
   },
 } as const;

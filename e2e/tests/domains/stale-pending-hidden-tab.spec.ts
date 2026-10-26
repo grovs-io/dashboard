@@ -97,7 +97,7 @@ test.describe("stale pending bubble — hidden tab variant", () => {
       }
     );
 
-    await page.goto("/link_behaviour/domain");
+    await page.goto("/dynamic_links/settings/domain");
     await expect(page.getByText("Pending", { exact: true })).toBeVisible({
       timeout: 15_000,
     });

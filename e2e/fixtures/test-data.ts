@@ -43,7 +43,6 @@ export const TEST_LINK = {
   updated_at: new Date().toISOString(),
   archived: false,
   ads_platform: "quick_link",
-  // TopPerformingLinksColumns maps over tags unguarded
   tags: ["promo"],
 };
 
@@ -97,6 +96,104 @@ export const TEST_METRICS_OVERVIEW = {
   current: metricValues,
   previous: { ...metricValues, link_views: 120 },
 };
+
+const widgetMeta = {
+  dashboard_id: 1,
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+export const TEST_METRIC_WIDGET = {
+  ...widgetMeta,
+  id: 11,
+  position: 0,
+  title: "Installs by country",
+  kind: "metric",
+  panel: null,
+  viz: "bar",
+  size: "md",
+  query: { metric: "installs", group_by: "country", limit: 10 },
+  filters: [],
+};
+
+export const TEST_PANEL_WIDGET = {
+  ...widgetMeta,
+  id: 12,
+  position: 1,
+  title: "Retention",
+  kind: "panel",
+  panel: "retention",
+  viz: "bar",
+  size: "sm",
+  query: {},
+  filters: [],
+};
+
+export const TEST_DASHBOARD = {
+  id: 1,
+  name: "Growth",
+  position: 0,
+  widgets: [TEST_METRIC_WIDGET, TEST_PANEL_WIDGET],
+  created_at: "2026-09-01T00:00:00.000Z",
+  updated_at: "2026-09-01T00:00:00.000Z",
+};
+
+export const TEST_METRIC_QUERY = {
+  metric: "installs",
+  group_by: "country",
+  rows: [
+    { key: "RO", label: "RO", value: 40, previous: 30 },
+    { key: "DE", label: "DE", value: 25, previous: 20 },
+    { key: "US", label: "US", value: 10, previous: 12 },
+  ],
+  other: { key: "__other__", label: "Other", value: 5, previous: 4 },
+  total: { value: 80, previous: 66 },
+};
+
+const smartBannerBase = {
+  status: "live",
+  platforms: ["ios", "android"],
+  url_include: [],
+  url_exclude: [],
+  position: "top",
+  subtitle: null,
+  button_text: "Open",
+  background_color: "#FFFFFF",
+  text_color: "#111827",
+  button_color: "#2563EB",
+  button_text_color: "#FFFFFF",
+  icon_url: null,
+  dismiss_days: 7,
+  open_hide_days: 30,
+  default_link: "https://test.grovs.io/sb-default",
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  stats: {
+    views: 120,
+    clicks: 30,
+    dismisses: 4,
+    ctr: 0.25,
+    opens: 20,
+    installs: 5,
+  },
+};
+
+export const TEST_SMART_BANNERS = [
+  {
+    ...smartBannerBase,
+    id: 1,
+    name: "Products",
+    priority: 0,
+    title: "Shop in the app",
+  },
+  {
+    ...smartBannerBase,
+    id: 2,
+    name: "Blog",
+    priority: 1,
+    title: "Read in the app",
+  },
+];
 
 export const MOCK_TOKENS = {
   access_token: "mock-access-token-for-testing",

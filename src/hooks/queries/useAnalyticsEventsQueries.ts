@@ -91,7 +91,9 @@ export function useAnalyticsEventVolumeQuery(
 
 export function useAnalyticsEventFieldValuesQuery(
   projectId: string | undefined,
-  params: AnalyticsFieldValuesParams | undefined
+  params: AnalyticsFieldValuesParams | undefined,
+  /** Keep the last list on screen while a new search loads. */
+  options: { keepPrevious?: boolean } = {}
 ) {
   return useInfiniteQuery<EventFieldValuesResponse>({
     queryKey: [
@@ -109,6 +111,7 @@ export function useAnalyticsEventFieldValuesQuery(
     initialPageParam: undefined as string | number | undefined,
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!projectId && !!params,
+    ...(options.keepPrevious ? { placeholderData: keepPreviousData } : {}),
   });
 }
 
@@ -123,5 +126,6 @@ export function useAnalyticsEventFieldsQuery(
       return response.data;
     },
     enabled: enabled && !!projectId,
+    staleTime: 10 * 60_000,
   });
 }

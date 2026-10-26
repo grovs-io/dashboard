@@ -31,14 +31,14 @@ beforeEach(() => {
 });
 
 describe("MigrationDeepLinkRedirect", () => {
-  it("redirects to /link_behaviour/domain#migration when ?tab=migration is present", () => {
+  it("redirects to /dynamic_links/settings/domain#migration when ?tab=migration is present", () => {
     setUrl("tab=migration", "");
 
     render(<MigrationDeepLinkRedirect />);
 
     expect(replaceMock).toHaveBeenCalledTimes(1);
     const target = replaceMock.mock.calls[0]?.[0] as string;
-    expect(target).toContain("/link_behaviour/domain");
+    expect(target).toContain("/dynamic_links/settings/domain");
     expect(target).toContain("#migration");
     // The tab param must NOT be preserved (otherwise the effect would loop).
     expect(target).not.toContain("tab=migration");
@@ -51,7 +51,7 @@ describe("MigrationDeepLinkRedirect", () => {
 
     expect(replaceMock).toHaveBeenCalledTimes(1);
     const target = replaceMock.mock.calls[0]?.[0] as string;
-    expect(target).toContain("/link_behaviour/domain");
+    expect(target).toContain("/dynamic_links/settings/domain");
     expect(target).toContain("#migration");
   });
 
@@ -81,12 +81,32 @@ describe("MigrationDeepLinkRedirect", () => {
 
     expect(replaceMock).toHaveBeenCalledTimes(1);
     const target = replaceMock.mock.calls[0]?.[0] as string;
-    expect(target).toContain("/link_behaviour/domain");
+    expect(target).toContain("/dynamic_links/settings/domain");
     expect(target).toContain("instance_id=inst-123");
     expect(target).toContain("env_type=production");
     expect(target).toContain("#migration");
     // Unrelated params should NOT be carried over.
     expect(target).not.toContain("other=ignored");
     expect(target).not.toContain("tab=migration");
+  });
+
+  it("sends legacy Stripe cancel URLs to Usage & Billing", () => {
+    setUrl("cancel=true42", "");
+
+    render(<MigrationDeepLinkRedirect fallback="/settings/team" />);
+
+    expect(replaceMock).toHaveBeenCalledWith(
+      "/settings/usage?instance_id=42&cancel=true"
+    );
+  });
+
+  it("forwards other /settings visits to the fallback", () => {
+    setUrl("instance_id=7&env_type=Test", "");
+
+    render(<MigrationDeepLinkRedirect fallback="/settings/team" />);
+
+    expect(replaceMock).toHaveBeenCalledWith(
+      "/settings/team?instance_id=7&env_type=Test"
+    );
   });
 });

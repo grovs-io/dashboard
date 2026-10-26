@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, type LucideIcon } from "lucide-react";
+import { ArrowRight, ChevronRight, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatCurrencyFromCents } from "@/utils/formatCurrency";
@@ -40,6 +40,7 @@ export function OverviewTopList({
   loading,
   empty,
   onItemClick,
+  className,
 }: {
   title: string;
   viewAllHref: string;
@@ -49,11 +50,17 @@ export function OverviewTopList({
   empty: TopListEmpty;
   /** When provided, each row becomes clickable (opens a modal / navigates). */
   onItemClick?: (id: string) => void;
+  className?: string;
 }) {
   const max = Math.max(...items.map((i) => i.value), 1);
 
   return (
-    <div className="rounded-md border border-sidebar-border bg-muted/50 p-4 dark:bg-card">
+    <div
+      className={cn(
+        "rounded-md border border-sidebar-border bg-muted/50 p-4 dark:bg-card",
+        className
+      )}
+    >
       <div className="mb-4 flex items-center justify-between">
         <span className="text-sm font-medium">{title}</span>
         {!loading && items.length > 0 && (
@@ -101,17 +108,25 @@ export function OverviewTopList({
                       {it.name}
                     </span>
                   </span>
-                  <span className="flex flex-shrink-0 flex-col items-end leading-tight">
-                    <span className="tabular-nums text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {numberFormatter.format(it.value)}
-                      </span>{" "}
-                      {unitLabel}
-                    </span>
-                    {it.revenueCents != null && it.revenueCents > 0 && (
-                      <span className="mt-0.5 text-[11px] font-medium tabular-nums text-valid-green">
-                        {formatCurrencyFromCents(it.revenueCents)}
+                  <span className="flex flex-shrink-0 items-start gap-1">
+                    <span className="flex flex-col items-end leading-tight">
+                      <span className="tabular-nums text-muted-foreground">
+                        <span className="font-semibold text-foreground">
+                          {numberFormatter.format(it.value)}
+                        </span>{" "}
+                        {unitLabel}
                       </span>
+                      {it.revenueCents != null && it.revenueCents > 0 && (
+                        <span className="mt-0.5 text-[11px] font-medium tabular-nums text-valid-green">
+                          {formatCurrencyFromCents(it.revenueCents)}
+                        </span>
+                      )}
+                    </span>
+                    {onItemClick && (
+                      <ChevronRight
+                        aria-hidden
+                        className="-mr-1 mt-0.5 size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                      />
                     )}
                   </span>
                 </div>
@@ -129,7 +144,7 @@ export function OverviewTopList({
                 key={it.id}
                 type="button"
                 onClick={() => onItemClick(it.id)}
-                className="group -mx-1.5 flex cursor-pointer flex-col gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--chart-users)]/40 dark:hover:bg-muted/60"
+                className="group -mx-2 flex cursor-pointer flex-col gap-1.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--chart-users)]/40 dark:hover:bg-muted/60"
               >
                 {rowInner}
               </button>

@@ -147,6 +147,7 @@ const AudienceItemDetailsDialog = ({
                     {section === "attributes" && (
                       <AudienceDetailsAttributes
                         visitorInfo={visitorInfo}
+                        push={visitorData?.push}
                         columns={columns}
                         table={table}
                         dataTable={dataTable}

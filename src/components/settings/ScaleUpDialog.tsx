@@ -1,169 +1,482 @@
 "use client";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "../ui/dialog";
-import {
-  Zap,
-  Link,
-  BarChart3,
-  DollarSign,
-  Users,
-  Smartphone,
-  MessageSquare,
-  ArrowRight,
-  Shield,
-  CalendarClock,
-} from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Cloud, Server, type LucideIcon } from "lucide-react";
+import { Dialog, DialogContent } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Skeleton } from "../ui/skeleton";
+import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { config } from "@/lib/config";
+import { getApiErrorInfo } from "@/lib/ApiError";
+import { queryKeys } from "@/lib/queryKeys";
+import { showErrorNotification } from "@/lib/Notifications";
+import { hasStripeKey } from "@/lib/stripe";
+import { isStripeOverlay } from "@/lib/stripeOverlay";
+import { trackEvent, EVENTS } from "@/analytics";
+import { useProjectSelection } from "@/context/useProjectSelection";
+import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMutations";
+import {
+  useSubscriptionQuery,
+  type SubscriptionResult,
+} from "@/hooks/queries/usePaymentsQueries";
+import type { Subscription } from "@/types";
+import {
+  FLAT_PLANS,
+  type BillingInterval,
+  type PlanChoice,
+  type PlanKey,
+} from "@/types/payment";
+import PlanSummary, { formatMoney, type FlatPlan } from "./PlanSummary";
+import PaymentStep from "./upgrade/PaymentStep";
+import ActivatingStep from "./upgrade/ActivatingStep";
+import DoneStep from "./upgrade/DoneStep";
+import StepHeader from "./upgrade/StepHeader";
+
+const INTERVALS: { value: BillingInterval; label: string }[] = [
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Yearly" },
+];
+
+const ALTERNATIVES: { icon: LucideIcon; title: string; description: string }[] =
+  [
+    {
+      icon: Cloud,
+      title: "More than 1M MAU",
+      description: "Enterprise in our cloud, one flat licence, custom terms",
+    },
+    {
+      icon: Server,
+      title: "Self-hosted",
+      description:
+        "Run grovs on your own infrastructure, with SSO and audit log",
+    },
+  ];
+
+const PlanRow = ({
+  plan,
+  interval,
+  selected,
+}: {
+  plan: FlatPlan;
+  interval: BillingInterval;
+  selected: boolean;
+}) => {
+  const id = useId();
+  const yearly = interval === "yearly";
+  return (
+    <label
+      htmlFor={id}
+      className={cn(
+        "grid cursor-pointer grid-cols-[16px_1fr_auto] items-center gap-3.5 rounded-[10px] border border-border bg-background px-4 py-3.5 transition-colors",
+        selected ? "border-chart-users bg-chart-users/5" : "hover:bg-muted/50"
+      )}
+    >
+      <RadioGroupItem
+        id={id}
+        value={plan.key}
+        className="data-[state=checked]:border-chart-users"
+      />
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">
+          {plan.name}
+          <span className="ml-1.5 font-normal text-muted-foreground">
+            {plan.band}
+          </span>
+        </div>
+        <div className="mt-[3px] text-[12.5px] text-muted-foreground">
+          {plan.description}
+        </div>
+      </div>
+      <div className="text-right whitespace-nowrap tabular-nums">
+        <div className="flex items-baseline justify-end gap-2">
+          {yearly && (
+            <s className="text-[13px] text-muted-foreground/70">
+              {formatMoney(plan.monthly * 12)}
+            </s>
+          )}
+          <span className="text-[15.5px] font-semibold">
+            {formatMoney(yearly ? plan.yearly : plan.monthly)}
+          </span>
+        </div>
+        <div className="mt-0.5 text-xs text-muted-foreground">
+          per {yearly ? "year" : "month"}
+        </div>
+      </div>
+    </label>
+  );
+};
+
+const PlanPicker = ({
+  initial,
+  onContinue,
+  isPending,
+}: {
+  initial: PlanChoice;
+  onContinue: (choice: PlanChoice) => void;
+  isPending?: boolean;
+}) => {
+  const [interval, setBillingInterval] = useState<BillingInterval>(
+    initial.interval
+  );
+  const [planKey, setPlanKey] = useState<PlanKey>(initial.plan);
+  const plan = FLAT_PLANS.find((p) => p.key === planKey)!;
+
+  return (
+    <>
+      <StepHeader
+        current={1}
+        description="Flat price per band. Every feature included, no per-MAU bills."
+      />
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_330px]">
+        <div className="px-6 pt-5 pb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
+              Choose a plan
+            </span>
+            <div
+              role="group"
+              aria-label="Billing interval"
+              className="inline-flex rounded-lg border border-border bg-background p-0.5"
+            >
+              {INTERVALS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={interval === value}
+                  onClick={() => setBillingInterval(value)}
+                  className={cn(
+                    "rounded-md px-3.5 py-[5px] text-[12.5px] font-medium transition-colors",
+                    interval === value
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <RadioGroup
+            aria-label="Plan"
+            value={planKey}
+            onValueChange={(value) => setPlanKey(value as PlanKey)}
+            className="gap-2"
+          >
+            {FLAT_PLANS.map((p) => (
+              <PlanRow
+                key={p.key}
+                plan={p}
+                interval={interval}
+                selected={p.key === planKey}
+              />
+            ))}
+          </RadioGroup>
+
+          <div className="mt-5">
+            <span className="mb-2 block text-xs font-medium text-muted-foreground">
+              Need something else
+            </span>
+            <div className="divide-y divide-border overflow-hidden rounded-[10px] border border-border">
+              {ALTERNATIVES.map(({ icon: Icon, title, description }) => (
+                <div
+                  key={title}
+                  className="grid grid-cols-[28px_1fr_auto] items-center gap-3 px-4 py-3"
+                >
+                  <div className="grid size-7 place-items-center rounded-[7px] border border-border bg-background text-foreground/80">
+                    <Icon className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[13.5px] font-semibold">{title}</div>
+                    <div className="mt-0.5 text-[12.5px] text-muted-foreground">
+                      {description}
+                    </div>
+                  </div>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-[30px] text-[12.5px]"
+                  >
+                    <a
+                      href={config.salesUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Contact sales
+                    </a>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <PlanSummary
+          plan={plan}
+          interval={interval}
+          isPending={isPending}
+          onContinue={() => onContinue({ plan: plan.key, interval })}
+        />
+      </div>
+    </>
+  );
+};
+
+const DEFAULT_CHOICE: PlanChoice = { plan: "growth_250k", interval: "yearly" };
+
+type Step = "plan" | "payment" | "activating" | "done";
+
+const ACTIVATION_TIMEOUT_MS = 180_000;
+const RECEIPT_WAIT_MS = 30_000;
+const WATCH_INTERVAL_MS = 3000;
+const WATCH_TIMEOUT_MS = 120_000;
+
+// Defensive: never treat a still-"pending" subscription as a payment issue.
+const hasPaymentIssue = (sub: Subscription | null | undefined) =>
+  !!sub?.payment_issue && sub.status !== "pending";
+
+const settled = (sub: Subscription | null | undefined) =>
+  hasPaymentIssue(sub) || (!!sub?.plan && !!sub.details?.active);
+
+const UpgradeFlow = ({
+  onClose,
+  submitting,
+  onSubmittingChange,
+  onStepChange,
+  initialChoice,
+}: {
+  onClose: () => void;
+  submitting: boolean;
+  onSubmittingChange: (submitting: boolean) => void;
+  onStepChange: (step: Step) => void;
+  initialChoice?: PlanChoice;
+}) => {
+  const { selectedInstance } = useProjectSelection();
+  const instanceId = selectedInstance?.id;
+  const createSubscription = useCreateSubscriptionMutation(instanceId);
+  const [step, setStep] = useState<Step>("plan");
+  const [choice, setChoice] = useState<PlanChoice>(
+    initialChoice ?? DEFAULT_CHOICE
+  );
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [receiptWaitOver, setReceiptWaitOver] = useState(false);
+  const [activationTimedOut, setActivationTimedOut] = useState(false);
+
+  const subscriptionQuery = useSubscriptionQuery(instanceId, {
+    refetchInterval: (query) => {
+      const sub = query.state.data?.subscription;
+      if (step === "activating")
+        return hasPaymentIssue(sub) || activationTimedOut ? false : 1500;
+      if (step === "done")
+        return sub?.latest_invoice?.status === "paid" || receiptWaitOver
+          ? false
+          : 4000;
+      return false;
+    },
+  });
+  const subscription = subscriptionQuery.data?.subscription ?? null;
+  const active = !!subscription?.plan && !!subscription.details?.active;
+  const plan = FLAT_PLANS.find((p) => p.key === choice.plan)!;
+
+  if (step === "activating" && active) setStep("done");
+
+  useEffect(() => onStepChange(step), [step, onStepChange]);
+
+  useEffect(() => {
+    if (step !== "done") return;
+    const timer = setTimeout(() => setReceiptWaitOver(true), RECEIPT_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== "activating") return;
+    const timer = setTimeout(
+      () => setActivationTimedOut(true),
+      ACTIVATION_TIMEOUT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [step]);
+
+  const handleComplete = useCallback(() => {
+    trackEvent(EVENTS.PURCHASE, {
+      instanceId,
+      plan: choice.plan,
+      interval: choice.interval,
+    });
+    setStep("activating");
+  }, [instanceId, choice]);
+
+  const startCheckout = async (next: PlanChoice) => {
+    setChoice(next);
+    if (!hasStripeKey) {
+      setClientSecret(null);
+      setStep("payment");
+      return true;
+    }
+    try {
+      const response = await createSubscription.mutateAsync(next);
+      setClientSecret(response.data.client_secret);
+      setStep("payment");
+      return true;
+    } catch (error) {
+      showErrorNotification(getApiErrorInfo(error).message);
+      return false;
+    }
+  };
+
+  // A plan picked elsewhere (the guided setup) goes straight to payment.
+  const [showPicker, setShowPicker] = useState(!initialChoice);
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!initialChoice || autoStarted.current) return;
+    autoStarted.current = true;
+    void startCheckout(initialChoice).then((ok) => {
+      if (!ok) setShowPicker(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
+  }, []);
+
+  const backToPlan = () => {
+    setShowPicker(true);
+    setClientSecret(null);
+    setStep("plan");
+  };
+
+  if (step === "payment") {
+    return (
+      <PaymentStep
+        plan={plan}
+        interval={choice.interval}
+        clientSecret={clientSecret}
+        onBack={backToPlan}
+        onComplete={handleComplete}
+        submitting={submitting}
+        onSubmittingChange={onSubmittingChange}
+      />
+    );
+  }
+  if (step === "done") {
+    return (
+      <DoneStep
+        plan={plan}
+        interval={choice.interval}
+        subscription={subscription}
+        onDone={onClose}
+      />
+    );
+  }
+  if (step === "activating") {
+    return (
+      <ActivatingStep
+        plan={plan}
+        interval={choice.interval}
+        status={
+          hasPaymentIssue(subscription)
+            ? "payment_issue"
+            : activationTimedOut
+              ? "timed_out"
+              : "working"
+        }
+        onClose={onClose}
+      />
+    );
+  }
+  if (!showPicker) {
+    return (
+      <>
+        <StepHeader current={2} />
+        <div
+          aria-label="Loading payment form"
+          className="grid gap-4 p-6 md:grid-cols-[340px_1fr]"
+        >
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </>
+    );
+  }
+  return (
+    <PlanPicker
+      initial={choice}
+      onContinue={startCheckout}
+      isPending={createSubscription.isPending}
+    />
+  );
+};
 
 const ScaleUpDialog = ({
   open,
   onOpenChange,
-  handleUpgrade,
+  initialChoice,
+  onPurchased,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  handleUpgrade: () => void;
+  /** Skips the plan step and opens payment for this plan. */
+  initialChoice?: PlanChoice;
+  /** Called when the dialog closes after a successful purchase. */
+  onPurchased?: () => void;
 }) => {
-  const benefits = [
-    { icon: Link, title: "Unlimited Links", desc: "No caps on link creation" },
-    { icon: Users, title: "Unlimited MAU", desc: "Scale to any audience size" },
-    {
-      icon: BarChart3,
-      title: "Advanced Analytics",
-      desc: "Full tracking & CSV exports",
-    },
-    {
-      icon: CalendarClock,
-      title: "2 Years Retention",
-      desc: "Query up to 2 years of analytics",
-    },
-    {
-      icon: DollarSign,
-      title: "Revenue Attribution",
-      desc: "Track purchases per link",
-    },
-    {
-      icon: Smartphone,
-      title: "All Platforms",
-      desc: "iOS, Android & Web SDKs",
-    },
-    {
-      icon: MessageSquare,
-      title: "Marketing Messages",
-      desc: "In-app & push messaging",
-    },
-    { icon: Shield, title: "SSO & Security", desc: "Single sign-on included" },
-    { icon: Zap, title: "Priority Computing", desc: "Faster link resolution" },
-  ];
+  const { selectedInstance } = useProjectSelection();
+  const instanceId = selectedInstance?.id;
+  const queryClient = useQueryClient();
+  const [submitting, setSubmitting] = useState(false);
+  const stepRef = useRef<Step>("plan");
+  const onStepChange = useCallback((step: Step) => {
+    stepRef.current = step;
+  }, []);
+  // Closed mid-activation: keep the shared subscription query fresh so the plan card catches up.
+  const [watching, setWatching] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!watching || open) return;
+    const queryKey = queryKeys.payments.subscription(watching);
+    const poll = setInterval(async () => {
+      // Don't let a tick cancel a slow in-flight request.
+      await queryClient.refetchQueries({ queryKey }, { cancelRefetch: false });
+      const data = queryClient.getQueryData<SubscriptionResult>(queryKey);
+      if (settled(data?.subscription)) setWatching(null);
+    }, WATCH_INTERVAL_MS);
+    const giveUp = setTimeout(() => setWatching(null), WATCH_TIMEOUT_MS);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(giveUp);
+    };
+  }, [watching, open, queryClient]);
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && submitting) return;
+    if (!next && instanceId) {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.payments.subscription(instanceId),
+      });
+      setWatching(stepRef.current === "activating" ? instanceId : null);
+    }
+    if (!next && stepRef.current === "done") onPurchased?.();
+    onOpenChange(next);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        aria-describedby="scale-up-plan"
-        className="flex flex-col w-full !max-w-[860px] gap-0 p-0 overflow-hidden"
+        showCloseButton={false}
+        className="block max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-[980px]"
+        onEscapeKeyDown={(event) => submitting && event.preventDefault()}
+        onInteractOutside={(event) => {
+          if (submitting || isStripeOverlay(event.target))
+            event.preventDefault();
+        }}
       >
-        <DialogHeader className="sr-only">
-          <DialogTitle>Scale Up Plan</DialogTitle>
-          <DialogDescription>Upgrade to the Scale Up plan</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left — Info */}
-          <div className="flex flex-col justify-between w-[300px] shrink-0 px-8 py-12 border-r border-sidebar-border">
-            <div>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#FEE950] text-[#1A1A1B] text-[10px] font-bold uppercase tracking-widest">
-                Most popular
-              </span>
-
-              <h3 className="text-2xl font-bold tracking-tight mt-4">
-                Scale Up
-              </h3>
-
-              <div className="mt-5">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold tracking-tight">
-                    $1.99
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    / 1k MAU
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  per month, billed monthly
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 mt-8">
-              <Button
-                className="w-full h-11 text-sm font-semibold bg-foreground hover:bg-foreground/90 text-background"
-                onClick={handleUpgrade}
-              >
-                <Zap className="h-4 w-4" />
-                Get started for free
-              </Button>
-              <a
-                href={`${config.pricingUrl}#calculator`}
-                target="_blank"
-                className="flex items-center justify-center gap-1.5 w-full h-9 rounded-lg text-xs font-medium border border-sidebar-border hover:bg-muted/80 transition-colors"
-              >
-                <DollarSign className="h-3.5 w-3.5" />
-                Estimate cost
-                <ArrowRight className="h-3 w-3" />
-              </a>
-              <span className="text-[11px] text-muted-foreground text-center">
-                First 10k MAU free
-              </span>
-            </div>
-          </div>
-
-          {/* Right — Benefits grid */}
-          <div className="flex-1 bg-muted/30 px-7 py-12 overflow-y-auto flex flex-col">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              What you get
-            </span>
-            <p className="text-sm text-muted-foreground mt-1.5 mb-5 leading-relaxed">
-              The most scalable deep linking, attribution, and referral solution
-              on the market.
-            </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {benefits.map((item, index) => (
-                <div
-                  key={item.title}
-                  className="flex items-start gap-3 p-3.5 rounded-xl bg-background border border-sidebar-border shadow-[0_1px_3px_0_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_0_rgba(0,0,0,0.08)] transition-shadow animate-fade-up"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-foreground/[0.05] shrink-0">
-                    <item.icon className="h-4 w-4 text-foreground/70" />
-                  </div>
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-[13px] font-semibold leading-tight">
-                      {item.title}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground leading-snug">
-                      {item.desc}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <a
-              href={`${config.pricingUrl}#features`}
-              target="_blank"
-              className="inline-flex items-center gap-1.5 mt-5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              See all features
-              <ArrowRight className="h-3 w-3" />
-            </a>
-          </div>
-        </div>
+        <UpgradeFlow
+          onClose={() => handleOpenChange(false)}
+          submitting={submitting}
+          onSubmittingChange={setSubmitting}
+          onStepChange={onStepChange}
+          initialChoice={initialChoice}
+        />
       </DialogContent>
     </Dialog>
   );

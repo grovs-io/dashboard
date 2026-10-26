@@ -19,11 +19,14 @@ import {
   useMauQuery,
 } from "@/hooks/queries/usePaymentsQueries";
 import { showErrorNotification, showGenericError } from "@/lib/Notifications";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { setupHref } from "@/components/onboarding/setupRules";
 import type { Instance } from "@/types";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useUserContext } from "@/context/useUserContext";
 import { writeSearchParams } from "@/lib/searchParamsUrl";
+import { chooseInstance } from "@/lib/projectSearchParams";
+import { readLastSelection, writeLastSelection } from "@/lib/lastSelection";
 
 export default function ClientLayout({
   children,
@@ -31,6 +34,7 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const {
     setSelectedProject,
@@ -56,6 +60,12 @@ export default function ClientLayout({
   const firstLoginRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
+  const noProjects = instancesQuery.data?.length === 0;
+  // The first-project form leads into setup; load that page's code while it's filled in.
+  useEffect(() => {
+    if (noProjects) router.prefetch("/setup");
+  }, [noProjects, router]);
+
   const updateSearchParams = useCallback(
     (paramsObj: Record<string, string | (string | number | undefined)>) => {
       writeSearchParams(paramsObj);
@@ -63,43 +73,30 @@ export default function ClientLayout({
     []
   );
 
+  // The URL wins; a page reached without params falls back to what was last chosen on this browser.
   const initializeFromParams = useCallback(() => {
-    const projectType = searchParams.get("env_type");
+    const projectType =
+      searchParams.get("env_type") ?? readLastSelection()?.env_type;
     if (projectType) {
       setProjectType(projectType);
     }
   }, [searchParams, setProjectType]);
 
-  const selectLatestInstanceCreated = useCallback(
-    (sortedInstances: Instance[]) => {
-      const latestInstanceCreated = sortedInstances[0];
-      setSelectedInstance(latestInstanceCreated);
-    },
-    [setSelectedInstance]
-  );
-
   const handleInstanceResponse = useCallback(
     (sortedInstances: Instance[]) => {
+      if (sortedInstances.length === 0) return;
       const currentParams = new URLSearchParams(window.location.search);
-      if (currentParams.get("instance_id")) {
-        const found = sortedInstances.find(
-          (item: Instance) =>
-            String(item.id) === currentParams.get("instance_id")
-        );
-        if (found) {
-          setSelectedInstance(found);
-        } else {
-          selectLatestInstanceCreated(sortedInstances);
-          showErrorNotification(`You don't have access to this project`);
-        }
-      } else {
-        if (sortedInstances.length > 0) {
-          firstLoginRef.current = true;
-          selectLatestInstanceCreated(sortedInstances);
-        }
-      }
+      const { instance, denied } = chooseInstance(
+        sortedInstances,
+        currentParams.get("instance_id"),
+        readLastSelection()?.instance_id
+      );
+      if (denied)
+        showErrorNotification(`You don't have access to this project`);
+      else if (!currentParams.get("instance_id")) firstLoginRef.current = true;
+      setSelectedInstance(instance);
     },
-    [setSelectedInstance, selectLatestInstanceCreated]
+    [setSelectedInstance]
   );
 
   const handleCreateInstance = async (
@@ -123,12 +120,10 @@ export default function ClientLayout({
       setSelectedInstance(instance);
       const links = inviteLinksFromCreateResponse(response.data.invite_urls);
       if (links) setInviteLinks(links);
-      try {
-        await fetchCurrentUser();
-      } catch {
-        // silently ignore fetchCurrentUser failure
-      }
-      // No need to manually refetch instances — the mutation auto-invalidates the query
+      // Also lets the URL pick up the new project first; a later replaceState would cancel the push.
+      await fetchCurrentUser().catch(() => {});
+      // The invite links dialog lives here too, so it stays up over the setup.
+      router.push(setupHref(instance.id));
     } catch {
       showGenericError();
     }
@@ -194,6 +189,10 @@ export default function ClientLayout({
     updateSearchParams({
       env_type: projectType,
       instance_id: selectedInstance.id,
+    });
+    writeLastSelection({
+      instance_id: String(selectedInstance.id),
+      env_type: projectType,
     });
   }, [projectType, selectedInstance, setSelectedProject, updateSearchParams]);
 

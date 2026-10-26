@@ -96,12 +96,16 @@ describe("useConfigurationMutations", () => {
           showIosPreview: false,
           copyToClipboardAndroid: true,
           copyToClipboardIos: false,
+          inAppBrowserPageAndroid: true,
+          inAppBrowserPageIos: false,
         });
       });
 
       expect(mockedSetDefaultRedirect).toHaveBeenCalledWith(
         "proj-1",
         "https://example.com",
+        true,
+        false,
         true,
         false,
         true,
@@ -125,6 +129,8 @@ describe("useConfigurationMutations", () => {
           showIosPreview: false,
           copyToClipboardAndroid: false,
           copyToClipboardIos: false,
+          inAppBrowserPageAndroid: false,
+          inAppBrowserPageIos: false,
         });
       });
 

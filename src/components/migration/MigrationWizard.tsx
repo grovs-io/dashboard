@@ -541,7 +541,7 @@ const MigrationWizard = ({
             <AlertDialogFooter>
               <AlertDialogAction
                 onClick={() => {
-                  window.location.href = "/settings?tab=plan";
+                  window.location.href = "/settings/usage";
                 }}
               >
                 Open billing

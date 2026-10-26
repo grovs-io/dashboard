@@ -6,6 +6,7 @@ import { createTestQueryClient } from "./query-test-utils";
 import {
   useLinksListQuery,
   useLinksByIdsQuery,
+  useLinksLookupQuery,
   usePathAvailableQuery,
   useRandomPathQuery,
 } from "../queries/useLinksQueries";
@@ -14,6 +15,7 @@ import type { GetLinksParams } from "@/types";
 vi.mock("@/api/links/linksService", () => ({
   getProjectLinksAPICall: vi.fn(),
   getLinksByIdAPICall: vi.fn(),
+  lookupLinksAPICall: vi.fn(),
   availablePathAPICall: vi.fn(),
   getRandomPathAPICall: vi.fn(),
 }));
@@ -21,12 +23,14 @@ vi.mock("@/api/links/linksService", () => ({
 import {
   getProjectLinksAPICall,
   getLinksByIdAPICall,
+  lookupLinksAPICall,
   availablePathAPICall,
   getRandomPathAPICall,
 } from "@/api/links/linksService";
 
 const mockedGetProjectLinks = vi.mocked(getProjectLinksAPICall);
 const mockedGetLinksById = vi.mocked(getLinksByIdAPICall);
+const mockedLookup = vi.mocked(lookupLinksAPICall);
 const mockedAvailablePath = vi.mocked(availablePathAPICall);
 const mockedGetRandomPath = vi.mocked(getRandomPathAPICall);
 
@@ -46,6 +50,33 @@ describe("useLinksQueries", () => {
   beforeEach(() => {
     queryClient = createTestQueryClient();
     vi.clearAllMocks();
+  });
+
+  describe("useLinksLookupQuery", () => {
+    it("is disabled when params is null", () => {
+      const { result } = renderHook(() => useLinksLookupQuery("proj-1", null), {
+        wrapper: createWrapper(queryClient),
+      });
+      expect(result.current.fetchStatus).toBe("idle");
+      expect(mockedLookup).not.toHaveBeenCalled();
+    });
+
+    it("returns the links array for the term", async () => {
+      mockedLookup.mockResolvedValueOnce({
+        data: { links: [{ id: 4821, name: "Spring" }] },
+      } as never);
+      const { result } = renderHook(
+        () => useLinksLookupQuery("proj-1", { term: "spr", limit: 20 }),
+        { wrapper: createWrapper(queryClient) }
+      );
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual([{ id: 4821, name: "Spring" }]);
+      expect(mockedLookup).toHaveBeenCalledWith(
+        "proj-1",
+        { term: "spr", limit: 20 },
+        expect.any(AbortSignal)
+      );
+    });
   });
 
   describe("useLinksListQuery", () => {

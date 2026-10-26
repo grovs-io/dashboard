@@ -4,7 +4,7 @@ test.describe("Settings Page", () => {
   test("loads settings page with active users chart", async ({
     authenticatedPage: page,
   }) => {
-    await page.goto("/settings");
+    await page.goto("/settings/usage");
 
     await expect(page.getByText(/active users/i).first()).toBeVisible({
       timeout: 10_000,
@@ -14,7 +14,7 @@ test.describe("Settings Page", () => {
   test("team members section is visible", async ({
     authenticatedPage: page,
   }) => {
-    await page.goto("/settings");
+    await page.goto("/settings/team");
 
     await expect(page.getByText(/team|members/i).first()).toBeVisible({
       timeout: 10_000,
@@ -24,7 +24,7 @@ test.describe("Settings Page", () => {
   test("plan section shows subscription info", async ({
     authenticatedPage: page,
   }) => {
-    await page.goto("/settings");
+    await page.goto("/settings/usage");
 
     await expect(
       page.getByText(/plan|subscription|growth/i).first()
@@ -32,7 +32,7 @@ test.describe("Settings Page", () => {
   });
 
   test("export button is functional", async ({ authenticatedPage: page }) => {
-    await page.goto("/settings");
+    await page.goto("/settings/usage");
 
     const exportButton = page.getByRole("button", { name: /export/i }).first();
     await expect(exportButton).toBeVisible({ timeout: 10_000 });

@@ -15,7 +15,7 @@ const state = {
 };
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/settings",
+  usePathname: () => "/settings/team",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(""),
 }));
@@ -53,9 +53,6 @@ vi.mock("@/components/layout/team-switcher", () => ({
 }));
 vi.mock("@/components/layout/nav-user", () => ({
   NavUser: () => <div>user</div>,
-}));
-vi.mock("@/components/layout/nav-support", () => ({
-  NavSupport: () => <div>support</div>,
 }));
 
 import { AppSidebar } from "@/components/layout/app-sidebar";

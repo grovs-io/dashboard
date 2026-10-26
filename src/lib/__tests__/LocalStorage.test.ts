@@ -78,14 +78,4 @@ describe("LocalStorage", () => {
       expect(LocalStorage.getPlatformFilter()).toBe("ios");
     });
   });
-
-  describe("craft preview", () => {
-    it("sets, gets, and removes craft preview", () => {
-      LocalStorage.setCraftPreview("preview-data");
-      expect(LocalStorage.getCraftPreview()).toBe("preview-data");
-
-      LocalStorage.removeCraftPreview();
-      expect(LocalStorage.getCraftPreview()).toBeNull();
-    });
-  });
 });

@@ -24,6 +24,7 @@ export interface DataTableProps<T> {
   data: T[];
   selectedColumns: string[];
   onRowClick?: (row: T) => void;
+  isRowClickable?: (row: T) => boolean;
   getRowId?: (row: T) => string;
   getRowAriaLabel?: (row: T) => string;
   loading?: boolean;
@@ -48,6 +49,7 @@ const DataTable = <T,>({
   loading,
   hasFilters,
   emptyState,
+  isRowClickable,
   ariaLabel,
   stickyHeader,
   containerClassName,
@@ -82,7 +84,13 @@ const DataTable = <T,>({
 
   return (
     <div
-      className={cn("relative", containerClassName ?? defaultContainerClass)}
+      className={cn(
+        "relative",
+        // A thin classic scrollbar with a gutter sits beside the sticky header instead of floating over it.
+        stickyHeader &&
+          "[scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border",
+        containerClassName ?? defaultContainerClass
+      )}
       aria-live="polite"
       aria-atomic="true"
     >
@@ -126,49 +134,56 @@ const DataTable = <T,>({
               </TableRow>
             ))
           ) : table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && "selected"}
-                role={onRowClick ? "button" : undefined}
-                tabIndex={onRowClick ? 0 : undefined}
-                aria-label={
-                  onRowClick && getRowAriaLabel
-                    ? getRowAriaLabel(row.original)
-                    : undefined
-                }
-                onKeyDown={
-                  onRowClick
-                    ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onRowClick(row.original);
+            table.getRowModel().rows.map((row) => {
+              const rowClick =
+                onRowClick && (isRowClickable?.(row.original) ?? true)
+                  ? onRowClick
+                  : undefined;
+              return (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  role={rowClick ? "button" : undefined}
+                  tabIndex={rowClick ? 0 : undefined}
+                  aria-label={
+                    rowClick && getRowAriaLabel
+                      ? getRowAriaLabel(row.original)
+                      : undefined
+                  }
+                  onKeyDown={
+                    rowClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            rowClick(row.original);
+                          }
                         }
-                      }
-                    : undefined
-                }
-                className={cn(
-                  "bg-background border-sidebar-border",
-                  onRowClick && "cursor-pointer",
-                  loading && "opacity-70 pointer-events-none"
-                )}
-                onClick={
-                  onRowClick ? () => onRowClick(row.original) : undefined
-                }
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    key={cell.id}
-                    className={cn(
-                      skeletonCellClassName,
-                      cellClassName?.(cell.column.id)
-                    )}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+                      : undefined
+                  }
+                  className={cn(
+                    "bg-background border-sidebar-border",
+                    rowClick && "cursor-pointer",
+                    loading && "opacity-70 pointer-events-none"
+                  )}
+                  onClick={rowClick ? () => rowClick(row.original) : undefined}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        skeletonCellClassName,
+                        cellClassName?.(cell.column.id)
+                      )}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })
           ) : hasFilters ? (
             <TableRow className="hover:bg-transparent">
               <TableCell

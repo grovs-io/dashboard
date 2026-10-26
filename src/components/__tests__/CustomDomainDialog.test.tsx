@@ -738,9 +738,9 @@ describe("CustomDomainDialog", () => {
     expect(await screen.findByText(/paid plan/i)).toBeInTheDocument();
   });
 
-  it("fires a retryable toast on 502", async () => {
+  it("fires a retryable toast on 424", async () => {
     setQuery({ data: null });
-    addMutateAsync.mockRejectedValueOnce(new ApiError("cf", 502));
+    addMutateAsync.mockRejectedValueOnce(new ApiError("cf", 424));
     renderDialog();
     fireEvent.change(screen.getByPlaceholderText("links.acme.com"), {
       target: { value: "links.acme.com" },

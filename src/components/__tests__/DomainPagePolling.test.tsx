@@ -60,6 +60,8 @@ vi.mock("@/hooks/mutations/usePaymentsMutations", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn() })),
+  usePathname: () => "/dynamic_links/settings/domain",
+  useSearchParams: () => new URLSearchParams(""),
 }));
 vi.mock("@/analytics", () => ({
   trackEvent: vi.fn(),
@@ -81,7 +83,7 @@ import {
   getCustomDomainPreflightAPICall,
 } from "@/api/configurations/domains/configDomainsService";
 import { getMigrationSourceAPICall } from "@/api/migrations/migrationsService";
-import DomainPage from "@/app/(protected)/link_behaviour/domain/page";
+import DomainPage from "@/app/(protected)/dynamic_links/settings/domain/page";
 
 const mockedDomainConfig = vi.mocked(getProjectDomainAPICall);
 const mockedSingular = vi.mocked(getCustomDomainAPICall);

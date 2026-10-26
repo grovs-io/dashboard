@@ -1,3 +1,5 @@
+export const IOS_SPM_URL = "https://github.com/grovs-io/grovs-iOS.git";
+
 export const appDelegateContent = `import UIKit
 import Grovs
 

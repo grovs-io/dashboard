@@ -1,8 +1,6 @@
 //sidebarNav options
 export const SETTING = "Project settings" as const;
 export const CONFIGURATION = "Configuration" as const;
-export const NOTIFICATIONS = "Notifications" as const;
-export const MESSAGES = "Messages" as const;
 export const LINKS = "Links" as const;
 export const CAMPAIGNS = "Campaigns" as const;
 export const USERS = "Users" as const;
@@ -130,10 +128,6 @@ export const REDIRECT_APP = "redirect_app" as const;
 
 export const LINK_DIALOG = "link_dialog" as const;
 export const CAMPAIGN_DIALOG = "campaign_dialog" as const;
-
-export const EXISTING_USERS_FILTER = "existing_users" as const;
-export const NEW_USERS_FILTER = "new_users" as const;
-export const ALL_USERS_FILTER = "all_users" as const;
 
 export const FULL_CHECK = "full-check" as const;
 export const PARTIAL_CHECK = "partial-check" as const;

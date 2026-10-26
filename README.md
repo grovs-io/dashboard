@@ -89,7 +89,7 @@ src/
 ├── hooks/                   # Custom React hooks
 ├── lib/                     # Utilities (API client, storage, helpers)
 └── constants/               # App constants
-ee/                          # Enterprise Edition (revenue, audit log, SSO/SCIM) — see license below
+ee/                          # Enterprise Edition (segments, push, in-app, journeys, event streaming, revenue, audit log, SSO/SCIM) — see license below
 ├── api/ hooks/ components/ types/ constants/   # mirror src/, imported as @ee/*
 └── app/                     # page bodies re-exported by routes under src/app/(protected)/
 ```
@@ -98,6 +98,11 @@ ee/                          # Enterprise Edition (revenue, audit log, SSO/SCIM)
 
 The features under `ee/` are switched on with `NEXT_PUBLIC_GROVS_EE=true` at build time. Without it the core edition runs unchanged and the enterprise screens stay hidden.
 
+- **Segments** — Audience builder with live reach, members, breakdowns and CSV exports
+- **Push campaigns** — Composer, targeting, scheduling and delivery reports for APNs and FCM
+- **In-app messages** — Templates, surveys and custom HTML with a live preview, targeting and reports
+- **Journeys** — Visual multi-step flows across push and in-app messages, with A/B paths
+- **Event streaming** — Destinations and exports for raw event data
 - **Revenue tracking** — IAP revenue metrics, per-link and per-campaign revenue columns, revenue setup steps
 - **Audit log** — Tamper-evident audit log explorer with SIEM export tokens
 - **Enterprise SSO and SCIM** — Per-instance OIDC connection with verified email domains and SCIM provisioning settings
@@ -137,4 +142,4 @@ See [SECURITY.md](SECURITY.md) for our vulnerability disclosure policy.
 Grovs uses a dual license model:
 
 - **Core (MIT)** — Everything outside the `ee/` directory is licensed under the [MIT License](LICENSE). You can freely use, modify, and distribute it.
-- **Enterprise** — The `ee/` directory contains enterprise features (revenue tracking, audit log, enterprise SSO and SCIM) under the [Grovs Enterprise License](ee/LICENSE). Production use of enterprise features requires a valid subscription.
+- **Enterprise** — The `ee/` directory contains enterprise features (segments, push campaigns, in-app messages, journeys, event streaming, revenue tracking, audit log, enterprise SSO and SCIM) under the [Grovs Enterprise License](ee/LICENSE). Production use of enterprise features requires a valid subscription.

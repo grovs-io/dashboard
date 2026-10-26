@@ -40,9 +40,9 @@ const connection = (overrides: Partial<SsoConnection> = {}): SsoConnection => ({
   client_secret_expires_soon: false,
   domains: [
     {
-      domain: "uhc.com",
+      domain: "acme.com",
       verified_at: null,
-      record_name: "_grovs-sso.uhc.com",
+      record_name: "_grovs-sso.acme.com",
       record_value: "grovs-sso-verification=x",
     },
   ],
@@ -92,7 +92,7 @@ describe("SsoSection", () => {
       active: true,
       domains: [
         {
-          domain: "uhc.com",
+          domain: "acme.com",
           verified_at: "2026-09-03T00:00:00Z",
           record_name: "n",
           record_value: "v",
@@ -118,28 +118,28 @@ describe("SsoSection", () => {
 
     fireEvent.click(screen.getByText("Add domain"));
     fireEvent.change(screen.getByLabelText("Domains"), {
-      target: { value: "Optum.com, uhc.com\nnot a domain" },
+      target: { value: "Example.org, acme.com\nnot a domain" },
     });
     expect(screen.getByText("already added")).toBeInTheDocument();
     expect(screen.getAllByText("not a domain").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /^Add domain$/ })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Domains"), {
-      target: { value: "Optum.com, uhc.com" },
+      target: { value: "Example.org, acme.com" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^Add domain$/ }));
     await waitFor(() =>
       expect(mocks.upsert.mutateAsync).toHaveBeenCalledWith({
-        domains: ["uhc.com", "optum.com"],
+        domains: ["acme.com", "example.org"],
       })
     );
 
-    fireEvent.click(screen.getByLabelText("Remove uhc.com"));
-    expect(screen.getByText("Remove uhc.com?")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Remove acme.com"));
+    expect(screen.getByText("Remove acme.com?")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Continue"));
     const confirm = screen.getByRole("button", { name: "Remove domain" });
     expect(confirm).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Domain"), {
-      target: { value: "uhc.com" },
+      target: { value: "acme.com" },
     });
     expect(confirm).toBeEnabled();
     fireEvent.click(confirm);

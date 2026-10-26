@@ -40,6 +40,13 @@ const presetStart = (preset: Preset, now: Date): Date => {
     : startOfDay(start);
 };
 
+const sameRange = (
+  a: DateRange | undefined,
+  b: DateRange | undefined
+): boolean =>
+  a?.from?.getTime() === b?.from?.getTime() &&
+  a?.to?.getTime() === b?.to?.getTime();
+
 const timeOfDay = (d: Date | undefined): string =>
   d ? format(d, "HH:mm") : "";
 
@@ -58,11 +65,18 @@ export function DateRangePicker({
   defaultPresetLabel,
   minDate,
   maxDate,
+  header,
   footer,
   withTime = false,
   presetsPosition = "left",
   onUpgrade,
+  compact = false,
+  id,
+  disabled = false,
 }: {
+  compact?: boolean;
+  id?: string;
+  disabled?: boolean;
   date: DateRange | undefined;
   setDate: (date: DateRange | undefined) => void;
   presets?: Preset[];
@@ -71,6 +85,8 @@ export function DateRangePicker({
   minDate?: Date;
   /** Newest selectable date. */
   maxDate?: Date;
+  /** Slot rendered above the presets column. */
+  header?: ReactNode;
   /** Slot rendered under the presets column — e.g. an upgrade CTA. */
   footer?: ReactNode;
   /**
@@ -92,6 +108,17 @@ export function DateRangePicker({
   const [activePresetLabel, setActivePresetLabel] = useState<
     string | undefined
   >(defaultPresetLabel);
+  // An outside change to `date` (e.g. granularity snapping it) makes the preset label stale.
+  const [labelledRange, setLabelledRange] = useState<DateRange | undefined>(
+    date
+  );
+  const [seenDate, setSeenDate] = useState<DateRange | undefined>(date);
+  if (date !== seenDate) {
+    setSeenDate(date);
+    if (activePresetLabel && !sameRange(date, labelledRange)) {
+      setActivePresetLabel(undefined);
+    }
+  }
   const [open, setOpen] = useState(false);
   // In time mode the user edits a draft and commits on Apply.
   const [draft, setDraft] = useState<DateRange | undefined>(date);
@@ -196,9 +223,14 @@ export function DateRangePicker({
     <div
       className={cn(
         "flex flex-col gap-1 border-sidebar-border p-3 min-w-[150px]",
-        presetsPosition === "right" ? "border-l" : "border-r"
+        compact
+          ? "flex-row flex-wrap border-b"
+          : presetsPosition === "right"
+            ? "border-l"
+            : "border-r"
       )}
     >
+      {header && <div className="mb-1">{header}</div>}
       {presets.map((preset) => {
         // Presets that reach past the plan's retention window are out of range.
         const outOfRange =
@@ -230,6 +262,7 @@ export function DateRangePicker({
                 to: endOfDay(now),
               };
               setActivePresetLabel(preset.label);
+              setLabelledRange(range);
               setDate(range);
               // Reflect the preset in the calendar + time inputs, snap the
               // calendar to the range's month, and keep the popover open so the
@@ -251,8 +284,14 @@ export function DateRangePicker({
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
+          type="button"
+          disabled={disabled}
           variant="outline"
-          className="w-fit justify-start text-left font-normal rounded-md border-sidebar-border shadow-none hover:bg-secondary"
+          className={cn(
+            "w-fit justify-start text-left font-normal rounded-md border-sidebar-border shadow-none hover:bg-secondary",
+            compact && "w-full"
+          )}
         >
           {activePresetLabel ? (
             <span>{activePresetLabel}</span>
@@ -271,7 +310,9 @@ export function DateRangePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex">
+        <div
+          className={cn("flex", compact && "max-w-[calc(100vw-2rem)] flex-col")}
+        >
           {presetsPosition === "left" && presetsColumn}
           <div className="flex flex-col">
             <Calendar
@@ -280,7 +321,7 @@ export function DateRangePicker({
               onMonthChange={setMonth}
               selected={withTime ? draft : (draft ?? date)}
               onSelect={withTime ? handleDraftSelect : handleCalendarSelect}
-              numberOfMonths={2}
+              numberOfMonths={compact ? 1 : 2}
               disabled={
                 disabledMatchers.length > 0 ? disabledMatchers : undefined
               }

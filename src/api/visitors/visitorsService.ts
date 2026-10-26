@@ -7,6 +7,7 @@ import type {
   VisitorDetailMetrics,
   AggregatedVisitorMetrics,
   GetVisitorsParams,
+  VisitorPushStatus,
 } from "@/types";
 
 // --- Response types ---
@@ -31,6 +32,8 @@ interface GetVisitorDetailsResponse {
   metrics: VisitorDetailMetrics;
   aggregated_metrics: AggregatedVisitorMetrics | null;
   number_of_generated_links: number;
+  // Absent from backends that predate it.
+  push?: VisitorPushStatus | null;
 }
 
 // --- API calls ---

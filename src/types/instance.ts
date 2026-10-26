@@ -18,6 +18,10 @@ export interface AnalyticsRetention {
   cold_after_days: number;
   /** Whether heavy queries are allowed in the cold window. */
   can_query_cold: boolean;
+  /** Range cap for queries that read raw events (default 90). */
+  raw_max_days?: number;
+  /** Longer raw cap for counter metrics without heavy filters (default 366). */
+  raw_counter_max_days?: number;
 }
 
 export interface Instance {
@@ -33,6 +37,8 @@ export interface Instance {
   uri_scheme: string;
   production: Project;
   test: Project;
+  // The iOS app's App Store icon, else the Android app's Play icon; null until one is stored.
+  icon_url?: string | null;
   // Optional: absent on older backend deploys / self-hosted; treat missing as
   // "unbounded" rather than gating the UI.
   analytics_retention?: AnalyticsRetention;

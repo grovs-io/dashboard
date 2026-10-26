@@ -6,11 +6,13 @@ import { createTestQueryClient } from "./query-test-utils";
 import {
   useCreateSubscriptionMutation,
   useCancelSubscriptionMutation,
+  useResumeSubscriptionMutation,
 } from "../mutations/usePaymentsMutations";
 
 vi.mock("@/api/payments/paymentsService", () => ({
   createSubscriptionAPICall: vi.fn(),
   cancelSubscriptionAPICall: vi.fn(),
+  resumeSubscriptionAPICall: vi.fn(),
 }));
 
 vi.mock("@/analytics", () => ({
@@ -23,12 +25,14 @@ vi.mock("@/analytics", () => ({
 import {
   createSubscriptionAPICall,
   cancelSubscriptionAPICall,
+  resumeSubscriptionAPICall,
 } from "@/api/payments/paymentsService";
 
 import { trackEvent } from "@/analytics";
 
 const mockedCreateSubscription = vi.mocked(createSubscriptionAPICall);
 const mockedCancelSubscription = vi.mocked(cancelSubscriptionAPICall);
+const mockedResumeSubscription = vi.mocked(resumeSubscriptionAPICall);
 const mockedTrackEvent = vi.mocked(trackEvent);
 
 function createWrapper(queryClient: QueryClient) {
@@ -52,7 +56,7 @@ describe("usePaymentsMutations", () => {
   describe("useCreateSubscriptionMutation", () => {
     it("calls createSubscriptionAPICall with instanceId", async () => {
       mockedCreateSubscription.mockResolvedValueOnce({
-        data: { url: "https://stripe.com/checkout" },
+        data: { client_secret: "cs_test_123" },
       } as never);
 
       const { result } = renderHook(
@@ -61,15 +65,21 @@ describe("usePaymentsMutations", () => {
       );
 
       await act(async () => {
-        await result.current.mutateAsync();
+        await result.current.mutateAsync({
+          plan: "growth_250k",
+          interval: "monthly",
+        });
       });
 
-      expect(mockedCreateSubscription).toHaveBeenCalledWith("inst-1");
+      expect(mockedCreateSubscription).toHaveBeenCalledWith("inst-1", {
+        plan: "growth_250k",
+        interval: "monthly",
+      });
     });
 
-    it("tracks purchase event and invalidates subscription on success", async () => {
+    it("invalidates subscription on success without tracking a purchase", async () => {
       mockedCreateSubscription.mockResolvedValueOnce({
-        data: { url: "https://stripe.com/checkout" },
+        data: { client_secret: "cs_test_123" },
       } as never);
       const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -79,12 +89,13 @@ describe("usePaymentsMutations", () => {
       );
 
       await act(async () => {
-        await result.current.mutateAsync();
+        await result.current.mutateAsync({
+          plan: "growth_250k",
+          interval: "monthly",
+        });
       });
 
-      expect(mockedTrackEvent).toHaveBeenCalledWith("purchase", {
-        instanceId: "inst-1",
-      });
+      expect(mockedTrackEvent).not.toHaveBeenCalled();
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["payments", "subscription", "inst-1"],
       });
@@ -99,7 +110,9 @@ describe("usePaymentsMutations", () => {
       );
 
       await act(async () => {
-        await result.current.mutateAsync().catch(() => {});
+        await result.current
+          .mutateAsync({ plan: "growth_250k", interval: "monthly" })
+          .catch(() => {});
       });
 
       expect(invalidateSpy).not.toHaveBeenCalled();
@@ -153,6 +166,42 @@ describe("usePaymentsMutations", () => {
       });
 
       expect(invalidateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("useResumeSubscriptionMutation", () => {
+    it("calls resumeSubscriptionAPICall and invalidates subscription", async () => {
+      mockedResumeSubscription.mockResolvedValueOnce({
+        data: { result: true },
+      } as never);
+      const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+      const { result } = renderHook(
+        () => useResumeSubscriptionMutation("inst-1"),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      expect(mockedResumeSubscription).toHaveBeenCalledWith("inst-1");
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ["payments", "subscription", "inst-1"],
+      });
+    });
+
+    it("rejects without calling the API when instanceId is undefined", async () => {
+      const { result } = renderHook(
+        () => useResumeSubscriptionMutation(undefined),
+        { wrapper: createWrapper(queryClient) }
+      );
+
+      await act(async () => {
+        await result.current.mutateAsync().catch(() => {});
+      });
+
+      expect(mockedResumeSubscription).not.toHaveBeenCalled();
     });
   });
 });

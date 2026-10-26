@@ -13,6 +13,8 @@ export const VOLUME_MAX_DAYS = 90;
 export const ANALYTICS_ERROR_CODES = {
   retentionWindowExceeded: "retention_window_exceeded",
   queryTooHeavy: "query_too_heavy",
+  heavyFilterInCold: "heavy_filter_in_cold",
+  unsupportedFilter: "unsupported_filter",
 } as const;
 
 // ─── Retention window math ────────────────────────────────────────────────
@@ -67,18 +69,14 @@ export function isHeavyQueryShape(
   return filters.some((f) => HEAVY_OPERATORS.has(f.operator));
 }
 
-/**
- * True when a heavy query reaches into the cold window on a plan that can't
- * query cold — the backend will reject this with query_too_heavy, so the UI
- * warns proactively.
- */
+/** The backend rejects heavy queries into the cold window on every plan (query_too_heavy). */
 export function heavyShapeHitsCold(
   retention: AnalyticsRetention | undefined,
   rangeFrom: Date | undefined,
   isHeavy: boolean,
   now: Date
 ): boolean {
-  if (!retention || !rangeFrom || !isHeavy || retention.can_query_cold) {
+  if (!retention || !rangeFrom || !isHeavy) {
     return false;
   }
   const coldBefore = retentionColdBefore(retention, now);
@@ -127,6 +125,32 @@ export function getAnalyticsErrorInfo(err: unknown): AnalyticsErrorInfo {
       ),
       isRetention: false,
       isHeavy: true,
+    };
+  }
+
+  if (code === ANALYTICS_ERROR_CODES.heavyFilterInCold) {
+    return {
+      code,
+      title: "Filters can't reach this far back",
+      description: getApiErrorMessage(
+        err,
+        "“contains” and “is not” filters only run on recent data for your plan. Narrow the range or remove them."
+      ),
+      isRetention: false,
+      isHeavy: true,
+    };
+  }
+
+  if (code === ANALYTICS_ERROR_CODES.unsupportedFilter) {
+    return {
+      code,
+      title: "Unsupported filter",
+      description: getApiErrorMessage(
+        err,
+        "One of the filters isn't supported for this query. Remove it and try again."
+      ),
+      isRetention: false,
+      isHeavy: false,
     };
   }
 

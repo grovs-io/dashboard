@@ -46,14 +46,20 @@ export function useInstanceMembersQuery(instanceId: string | undefined) {
   });
 }
 
-export function useInstanceConfigQuery(instanceId: string | undefined) {
+export function useInstanceConfigQuery(
+  instanceId: string | undefined,
+  options: { enabled?: boolean; refetchOnWindowFocus?: boolean | "always" } = {}
+) {
   return useQuery({
     queryKey: queryKeys.instances.config(instanceId!),
     queryFn: async () => {
       const response = await getProjectConfigurationAPICall(instanceId!);
       return response.data.configurations;
     },
-    enabled: !!instanceId,
+    enabled: !!instanceId && (options.enabled ?? true),
+    ...(options.refetchOnWindowFocus !== undefined && {
+      refetchOnWindowFocus: options.refetchOnWindowFocus,
+    }),
   });
 }
 

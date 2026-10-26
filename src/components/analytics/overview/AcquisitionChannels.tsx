@@ -3,6 +3,7 @@
 import { Share2 } from "lucide-react";
 import { OverviewPanelEmpty } from "./OverviewPanelEmpty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import type { MetricsOverview } from "@/types";
 
 const CHANNELS = [
@@ -17,16 +18,31 @@ const numberFormatter = new Intl.NumberFormat("de-DE");
 export function AcquisitionChannels({
   metrics,
   loading,
+  className,
+  hideHeader = false,
 }: {
   metrics: MetricsOverview["current"] | undefined;
   loading?: boolean;
+  className?: string;
+  /** Inside a titled card, which names it already. */
+  hideHeader?: boolean;
 }) {
   const rows = CHANNELS.map((c) => ({ ...c, value: metrics?.[c.key] ?? 0 }));
   const total = rows.reduce((sum, r) => sum + r.value, 0);
 
   return (
-    <div className="rounded-md border border-sidebar-border bg-muted/50 p-4 dark:bg-card">
-      <div className="mb-4 flex items-center justify-between">
+    <div
+      className={cn(
+        "rounded-md border border-sidebar-border bg-muted/50 p-4 dark:bg-card",
+        className
+      )}
+    >
+      <div
+        className={cn(
+          "mb-4 flex items-center justify-between",
+          hideHeader && "hidden"
+        )}
+      >
         <span className="text-sm font-medium">Channels</span>
         {!loading && total > 0 && (
           <span className="text-xs text-muted-foreground tabular-nums">

@@ -18,6 +18,7 @@ type ActionConfirmProps = {
   description?: string;
   confirmText?: string;
   cancelText?: string;
+  pendingText?: string;
   showCloseButton?: boolean;
 };
 
@@ -29,6 +30,7 @@ const ActionConfirm = ({
   description = "This action cannot be undone. This will permanently delete the item.",
   confirmText = "Delete",
   cancelText = "Cancel",
+  pendingText = "Deleting...",
   showCloseButton = true,
 }: ActionConfirmProps) => {
   const [loading, setLoading] = useState(false);
@@ -69,7 +71,7 @@ const ActionConfirm = ({
             onClick={handleConfirm}
             disabled={loading}
           >
-            {loading ? "Deleting..." : confirmText}
+            {loading ? pendingText : confirmText}
           </Button>
         </DialogFooter>
       </DialogContent>

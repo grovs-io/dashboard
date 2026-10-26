@@ -1,56 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Area,
-  Line,
-  ComposedChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, ArrowUpRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { formatCurrencyFromCents } from "@/utils/formatCurrency";
 import { useOverviewKeyMetricSeriesQuery } from "@/hooks/queries/useAnalyticsOverviewQueries";
 import {
   AnalyticsEmptyState,
   AnalyticsNoResults,
 } from "../AnalyticsEmptyState";
-import type { GrowthChartPoint } from "./GrowthRevenueChart";
+import { numberFormatter, formatCompactNumber, pct } from "./metricFormat";
+import { TrendAreaChart, type TrendDatum } from "./TrendAreaChart";
+import type { TrendChartPoint } from "./types";
+import { newUsersSeries } from "@/lib/trendPoints";
 import type {
   OverviewKeyMetrics as KeyMetrics,
   ChartableKeyMetric,
   AnalyticsDateRangeParams,
+  AnalyticsGranularity,
 } from "@/types";
-import { parseCalendarDate } from "@/lib/dateUtils";
-
-const numberFormatter = new Intl.NumberFormat("de-DE");
-
-function formatAxisNumber(value: number | string): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return String(value);
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${Math.round(n / 1_000_000)}M`;
-  if (abs >= 10_000) return `${Math.round(n / 1000)}K`;
-  if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return numberFormatter.format(Math.round(n));
-}
-
-function pct(cur: number, prev: number): number {
-  if (!prev) return 0;
-  return Math.round(((cur - prev) / Math.abs(prev)) * 100);
-}
 
 // "new_users" + "revenue" chart from /trends/users; the rest from /key-metrics/series.
-type MetricKey = "new_users" | "revenue" | ChartableKeyMetric;
+export type MetricKey = "new_users" | "revenue" | ChartableKeyMetric;
 
 const CARDS: {
   key: MetricKey;
@@ -75,17 +49,14 @@ const CARDS: {
   { key: "referred_users", label: "Referred users" },
 ];
 
-const chartConfig = {
-  value: { label: "Current", color: "var(--chart-users)" },
-  previous: { label: "Previous", color: "var(--muted-foreground)" },
-} satisfies ChartConfig;
+export const METRIC_KEYS: readonly MetricKey[] = CARDS.map((c) => c.key);
 
 interface Props {
   projectId: string | undefined;
   keyMetrics?: KeyMetrics;
   keyMetricsPrev?: KeyMetrics;
-  /** Daily new-users + revenue series (from /overview/trends/users). */
-  trends?: GrowthChartPoint[];
+  /** New-users + revenue series at the selected granularity (from /overview/trends/users). */
+  trends?: TrendChartPoint[];
   revenueTotalCents: number;
   revenuePrevCents: number;
   revenueEnabled: boolean;
@@ -93,9 +64,18 @@ interface Props {
   seriesBaseParams: AnalyticsDateRangeParams;
   /** Previous equal-length range — drives the comparison line for count metrics. */
   seriesPrevParams?: AnalyticsDateRangeParams;
+  /** False when the range/filter combo would 422 the raw-events series endpoint. */
+  seriesEnabled: boolean;
   loading?: boolean;
   trendsLoading?: boolean;
   hasFilters?: boolean;
+  selected: MetricKey;
+  onSelect: (key: MetricKey) => void;
+  granularity: AnalyticsGranularity;
+  /** Metric keys the backend returned as 0 because of the active filters — hidden. */
+  unsupportedMetrics: string[];
+  /** Events Explorer deep link for the selected metric and current chips. */
+  explorerHref: string;
 }
 
 export function OverviewKeyMetrics({
@@ -108,12 +88,16 @@ export function OverviewKeyMetrics({
   revenueEnabled,
   seriesBaseParams,
   seriesPrevParams,
+  seriesEnabled,
   loading = false,
   trendsLoading = false,
   hasFilters = false,
+  selected,
+  onSelect,
+  granularity,
+  unsupportedMetrics,
+  explorerHref,
 }: Props) {
-  const [selected, setSelected] = useState<MetricKey>("new_users");
-
   const isSeries = selected !== "new_users" && selected !== "revenue";
   const isMoney = selected === "revenue";
 
@@ -121,27 +105,19 @@ export function OverviewKeyMetrics({
   // line, mirroring what /trends/users gives new users for free.
   const seriesCur = useOverviewKeyMetricSeriesQuery(
     projectId,
-    isSeries && seriesBaseParams.start_date
-      ? { ...seriesBaseParams, metric: selected }
+    isSeries && seriesEnabled && seriesBaseParams.start_date
+      ? { ...seriesBaseParams, metric: selected, granularity }
       : undefined
   );
   const seriesPrev = useOverviewKeyMetricSeriesQuery(
     projectId,
-    isSeries && seriesPrevParams?.start_date
-      ? { ...seriesPrevParams, metric: selected }
+    isSeries && seriesEnabled && seriesPrevParams?.start_date
+      ? { ...seriesPrevParams, metric: selected, granularity }
       : undefined
   );
 
-  const chartData = useMemo<
-    { date: string; value: number; previous?: number }[]
-  >(() => {
-    if (selected === "new_users") {
-      return (trends ?? []).map((p) => ({
-        date: p.date,
-        value: p.users,
-        previous: p.previousUsers,
-      }));
-    }
+  const chartData = useMemo<TrendDatum[]>(() => {
+    if (selected === "new_users") return newUsersSeries(trends ?? []);
     if (selected === "revenue") {
       return (trends ?? []).map((p) => ({
         date: p.date,
@@ -158,10 +134,12 @@ export function OverviewKeyMetrics({
     }));
   }, [selected, trends, seriesCur.data, seriesPrev.data]);
 
-  const hasPrevious = chartData.some((d) => typeof d.previous === "number");
   const chartLoading = isSeries ? seriesCur.isLoading : trendsLoading;
 
-  const cards = CARDS.filter((c) => !c.revenueOnly || revenueEnabled);
+  const cards = CARDS.filter(
+    (c) =>
+      (!c.revenueOnly || revenueEnabled) && !unsupportedMetrics.includes(c.key)
+  );
 
   const cardNumber = (key: MetricKey): number =>
     key === "revenue"
@@ -172,12 +150,7 @@ export function OverviewKeyMetrics({
       ? revenuePrevCents
       : (keyMetricsPrev?.[key as keyof KeyMetrics] ?? 0);
   const cardDisplay = (key: MetricKey, n: number): string =>
-    key === "revenue" ? formatCurrencyFromCents(n) : numberFormatter.format(n);
-
-  const moneyAxis = (value: number | string) => {
-    const n = Number(value);
-    return `$${n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n}`;
-  };
+    key === "revenue" ? formatCurrencyFromCents(n) : formatCompactNumber(n);
 
   return (
     <div className="overflow-hidden rounded-xl border border-sidebar-border bg-background">
@@ -199,7 +172,7 @@ export function OverviewKeyMetrics({
                   <button
                     key={c.key}
                     type="button"
-                    onClick={() => setSelected(c.key)}
+                    onClick={() => onSelect(c.key)}
                     aria-pressed={active}
                     className={cn(
                       "flex min-w-[150px] flex-1 flex-col gap-1 rounded-[10px] border bg-background px-3 py-2 text-left transition-colors",
@@ -219,8 +192,15 @@ export function OverviewKeyMetrics({
                       />
                       {c.label}
                     </span>
-                    <span className="flex items-baseline gap-1.5">
-                      <span className="text-lg font-bold tabular-nums tracking-tight">
+                    <span className="flex flex-wrap items-baseline gap-1.5">
+                      <span
+                        className="text-lg font-bold tabular-nums tracking-tight"
+                        title={
+                          c.key === "revenue"
+                            ? undefined
+                            : numberFormatter.format(cur)
+                        }
+                      >
                         {cardDisplay(c.key, cur)}
                       </span>
                       {delta !== 0 && (
@@ -240,6 +220,20 @@ export function OverviewKeyMetrics({
                   </button>
                 );
               })}
+        </div>
+
+        <div className="mb-2 flex justify-end">
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+          >
+            <Link href={explorerHref}>
+              Explore events
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </Button>
         </div>
 
         {chartLoading && chartData.length === 0 ? (
@@ -264,82 +258,16 @@ export function OverviewKeyMetrics({
               title="No activity yet"
               description="Track users, link views, installs, and opens over time. Integrate the Grovs SDK and this chart will fill in."
               sdkDescription="No activity recorded in this range yet."
-              linkHref="/developers"
+              linkHref="/settings/developers"
               linkLabel="Set up the SDK"
             />
           )
         ) : (
-          <ChartContainer config={chartConfig} className="h-[250px] w-full">
-            <ComposedChart
-              data={chartData}
-              margin={{ top: 10, right: 12, left: 6, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient id="fillKeyMetric" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-value)"
-                    stopOpacity={0.25}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-value)"
-                    stopOpacity={0}
-                  />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                tickFormatter={(value) =>
-                  parseCalendarDate(value).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })
-                }
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={10}
-                width={54}
-                allowDecimals={false}
-                tickFormatter={isMoney ? moneyAxis : formatAxisNumber}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    valueFormatter={
-                      isMoney
-                        ? (v: number) => moneyAxis(v)
-                        : numberFormatter.format
-                    }
-                  />
-                }
-              />
-              {hasPrevious && (
-                <Line
-                  type="monotone"
-                  dataKey="previous"
-                  stroke="var(--color-previous)"
-                  strokeDasharray="4 4"
-                  strokeWidth={1.5}
-                  dot={false}
-                />
-              )}
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="var(--color-value)"
-                strokeWidth={2}
-                fill="url(#fillKeyMetric)"
-              />
-            </ComposedChart>
-          </ChartContainer>
+          <TrendAreaChart
+            data={chartData}
+            granularity={granularity}
+            money={isMoney}
+          />
         )}
       </div>
     </div>

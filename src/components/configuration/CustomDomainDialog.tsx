@@ -60,11 +60,27 @@ import {
 
 // Light client check: ASCII, valid hostname, >= 3 labels (i.e. a subdomain,
 // not an apex). The server's 422 remains authoritative.
-function isLikelySubdomain(value: string): boolean {
+export function isLikelySubdomain(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
   if (!/^[\x00-\x7F]+$/.test(v)) return false;
   return /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.){2,}[a-z]{2,}$/i.test(v);
+}
+
+// Why isLikelySubdomain rejected a value; apex is set when a subdomain of it would pass.
+export function subdomainIssue(
+  value: string
+): { message: string; apex?: string } | null {
+  const v = value.trim();
+  if (!v || isLikelySubdomain(v)) return null;
+  if (!/^[\x00-\x7F]+$/.test(v))
+    return { message: "Use plain letters, numbers, dots and hyphens." };
+  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?\.[a-z]{2,}$/i.test(v))
+    return {
+      message: `${v} is a root domain. Use a subdomain of it instead.`,
+      apex: v,
+    };
+  return { message: "Enter a full subdomain, like links.yourcompany.com." };
 }
 
 function defaultMessageForStatus(status: number | undefined): string {
@@ -243,7 +259,7 @@ const PlatformSetupActions = ({
           }
           onClick={handleClick(
             markIosVisited,
-            "/developers/ios_setup?step=url_scheme"
+            "/settings/developers/ios_setup?step=url_scheme"
           )}
         />
       )}
@@ -262,7 +278,7 @@ const PlatformSetupActions = ({
           }
           onClick={handleClick(
             markAndroidVisited,
-            "/developers/android_setup?step=intent_filters"
+            "/settings/developers/android_setup?step=intent_filters"
           )}
         />
       )}
@@ -384,7 +400,8 @@ const CustomDomainDialog = ({
       // GET is invalidated by the mutation; the dialog transitions to Pending.
     } catch (err) {
       const status = getApiErrorStatus(err);
-      if (status === 502) {
+      // 424 is the backend's Cloudflare failure; 502 still arrives when the server itself is unreachable.
+      if (status === 424 || status === 502) {
         showRetryableError(
           manualMode
             ? "Temporary error reaching the server. Please try again."

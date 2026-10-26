@@ -13,9 +13,7 @@ import {
   isManualCustomDomainMode,
   preflightCnameVerdict,
 } from "@/lib/customDomainStatus";
-import { ApiError } from "@/lib/ApiError";
 import { queryKeys } from "@/lib/queryKeys";
-import { showErrorNotification } from "@/lib/Notifications";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import {
   useCustomDomainsEnvelopeQuery,
@@ -23,8 +21,8 @@ import {
 } from "@/hooks/queries/useConfigurationQueries";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
 import { useInstanceDetailsQuery } from "@/hooks/queries/useInstanceQueries";
-import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMutations";
 import { Skeleton } from "@/components/ui/skeleton";
+import { hasPaidPlan as isPaidPlan } from "@/lib/plan";
 import ScaleUpDialog from "@/components/settings/ScaleUpDialog";
 import CustomDomainDialog from "./CustomDomainDialog";
 
@@ -35,7 +33,9 @@ const CustomDomainSetup = ({
 }) => {
   const { selectedInstance } = useProjectSelection();
   const subscriptionQuery = useSubscriptionQuery(selectedInstance?.id);
-  const hasPaidPlan = !!subscriptionQuery.data?.subscription;
+  const sub = subscriptionQuery.data?.subscription;
+  // Self-hosted has no billing; the backend entitles every project there.
+  const hasPaidPlan = isPaidPlan(sub);
   const planLoading = subscriptionQuery.isLoading;
 
   // Drive the per-platform "go to app setup" actions off which SDKs are
@@ -46,10 +46,6 @@ const CustomDomainSetup = ({
   const iosIntegrated = instanceDetails?.get_started_setup?.ios_sdk === true;
   const androidIntegrated =
     instanceDetails?.get_started_setup?.android_sdk === true;
-
-  const createSubscriptionMutation = useCreateSubscriptionMutation(
-    selectedInstance?.id
-  );
 
   const { data, isLoading, isError, error } =
     useCustomDomainsEnvelopeQuery(projectId);
@@ -99,19 +95,6 @@ const CustomDomainSetup = ({
       queryClient.invalidateQueries({
         queryKey: queryKeys.projects.customDomain(projectId),
       });
-    }
-  };
-
-  const handleUpgrade = async () => {
-    try {
-      const response = await createSubscriptionMutation.mutateAsync();
-      window.location.href = response.data.url;
-    } catch (err) {
-      showErrorNotification(
-        err instanceof ApiError
-          ? err.message
-          : "Something went wrong, please try again"
-      );
     }
   };
 
@@ -245,11 +228,7 @@ const CustomDomainSetup = ({
           androidIntegrated={androidIntegrated}
         />
       )}
-      <ScaleUpDialog
-        open={scaleUpOpen}
-        onOpenChange={setScaleUpOpen}
-        handleUpgrade={handleUpgrade}
-      />
+      <ScaleUpDialog open={scaleUpOpen} onOpenChange={setScaleUpOpen} />
     </div>
   );
 };

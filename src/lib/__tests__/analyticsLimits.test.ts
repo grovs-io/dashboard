@@ -25,7 +25,7 @@ const paid: AnalyticsRetention = {
   plan: "paid",
   queryable_days: 730,
   cold_after_days: 365,
-  can_query_cold: false,
+  can_query_cold: true,
 };
 
 describe("retentionMinDate / retentionColdBefore", () => {
@@ -79,7 +79,7 @@ describe("isHeavyQueryShape", () => {
 });
 
 describe("heavyShapeHitsCold", () => {
-  it("warns when a heavy query reaches the cold window without cold access", () => {
+  it("warns when a heavy query reaches the cold window", () => {
     const coldStart = sub(NOW, { days: 400 }); // older than 365d cold boundary
     expect(heavyShapeHitsCold(paid, coldStart, true, NOW)).toBe(true);
   });
@@ -96,11 +96,11 @@ describe("heavyShapeHitsCold", () => {
     );
   });
 
-  it("does not warn when the plan can query cold", () => {
-    const enterprise: AnalyticsRetention = { ...paid, can_query_cold: true };
-    expect(
-      heavyShapeHitsCold(enterprise, sub(NOW, { days: 400 }), true, NOW)
-    ).toBe(false);
+  it("still warns on a paid plan that can query cold (backend rejects heavy cold on every plan)", () => {
+    const isHeavy = isHeavyQueryShape(undefined, [{ operator: "is_not" }]);
+    const beforeCold = sub(startOfDay(sub(NOW, { days: 365 })), { days: 1 });
+    expect(paid.can_query_cold).toBe(true);
+    expect(heavyShapeHitsCold(paid, beforeCold, isHeavy, NOW)).toBe(true);
   });
 
   it("does not warn without retention info", () => {
@@ -131,6 +131,39 @@ describe("getAnalyticsErrorInfo", () => {
     const info = getAnalyticsErrorInfo(err);
     expect(info.isHeavy).toBe(true);
     expect(info.isRetention).toBe(false);
+  });
+
+  it("maps heavy_filter_in_cold to a heavy error with the backend message", () => {
+    const err = new ApiError(
+      "nope",
+      422,
+      ANALYTICS_ERROR_CODES.heavyFilterInCold,
+      {
+        error: "is_not can't reach cold data",
+        error_code: "heavy_filter_in_cold",
+      }
+    );
+    const info = getAnalyticsErrorInfo(err);
+    expect(info.title).toBe("Filters can't reach this far back");
+    expect(info.isHeavy).toBe(true);
+    expect(info.isRetention).toBe(false);
+    expect(info.description).toBe("is_not can't reach cold data");
+  });
+
+  it("maps unsupported_filter with the backend message", () => {
+    const err = new ApiError(
+      "nope",
+      422,
+      ANALYTICS_ERROR_CODES.unsupportedFilter,
+      {
+        error: "Filter on foo is not supported",
+        error_code: "unsupported_filter",
+      }
+    );
+    const info = getAnalyticsErrorInfo(err);
+    expect(info.title).toBe("Unsupported filter");
+    expect(info.isHeavy).toBe(false);
+    expect(info.description).toBe("Filter on foo is not supported");
   });
 
   it("falls back to a generic message for unknown errors", () => {

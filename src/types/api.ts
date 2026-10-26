@@ -86,20 +86,6 @@ export interface GoogleTrackingIdPayload {
   google_tracking_id: string;
 }
 
-// --- Notification API payloads ---
-
-export interface CreateNotificationApiPayload {
-  title: string;
-  subtitle: string;
-  project_id: string;
-  platforms: string[];
-  new_users: boolean;
-  existing_users: boolean;
-  auto_display: boolean;
-  send_push: boolean;
-  html?: string;
-}
-
 // --- Platform config payloads ---
 // These can be either FormData (for file uploads) or typed objects.
 // Use `FormData | PlatformConfigPayload` at call sites.

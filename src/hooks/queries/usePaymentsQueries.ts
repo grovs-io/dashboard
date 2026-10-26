@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { IS_SELF_HOSTED } from "@/lib/edition";
 import { queryKeys } from "@/lib/queryKeys";
 import { ApiError } from "@/lib/ApiError";
@@ -10,12 +10,17 @@ import {
 } from "@/api/payments/paymentsService";
 import type { Subscription } from "@/types";
 
-interface SubscriptionResult {
+export interface SubscriptionResult {
   subscription: Subscription | null;
   isEnterprise: boolean;
 }
 
-export function useSubscriptionQuery(instanceId: string | undefined) {
+export function useSubscriptionQuery(
+  instanceId: string | undefined,
+  options: {
+    refetchInterval?: UseQueryOptions<SubscriptionResult>["refetchInterval"];
+  } = {}
+) {
   return useQuery<SubscriptionResult>({
     queryKey: queryKeys.payments.subscription(instanceId!),
     queryFn: async () => {
@@ -33,6 +38,7 @@ export function useSubscriptionQuery(instanceId: string | undefined) {
       }
     },
     enabled: !!instanceId && !IS_SELF_HOSTED, // no Stripe on self-hosted
+    refetchInterval: options.refetchInterval,
   });
 }
 

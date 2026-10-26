@@ -1,6 +1,18 @@
-MIT License
+Copyright (c) 2023-2026 Appssemble Soft SRL
 
-Copyright (c) 2026 appssemble
+With regard to the Grovs Software:
+
+This software and associated documentation files (the "Software") may be used,
+copied, modified, merged, published, distributed, sublicensed, and/or sold under
+the following conditions:
+
+1. Content in the "ee/" directory of this repository is governed by a separate
+   license defined in "ee/LICENSE".
+
+2. All third-party components incorporated into the Software are licensed under
+   the original license provided by the owner of the applicable component.
+
+3. Everything else is available under the MIT Expat license, as follows:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

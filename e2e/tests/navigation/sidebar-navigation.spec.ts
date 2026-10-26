@@ -6,21 +6,24 @@ test.describe("Sidebar Navigation", () => {
   }) => {
     await page.goto("/dashboard");
 
-    // Key navigation items should be visible in sidebar
-    await expect(page.getByText(/dashboard/i).first()).toBeVisible({
+    const nav = page.getByLabel("Main navigation");
+    await expect(nav.getByRole("link", { name: "Home" })).toBeVisible({
       timeout: 10_000,
     });
+    for (const section of ["Analytics", "Links", "Audience", "Settings"]) {
+      await expect(
+        nav.getByRole("button", { name: section, exact: true })
+      ).toBeVisible();
+    }
   });
 
   test("navigates to links page", async ({ authenticatedPage: page }) => {
     await page.goto("/dashboard");
 
-    // "Links" only renders once its "Dynamic Links" group is expanded
-    await page
-      .getByRole("button", { name: /dynamic links/i })
-      .first()
-      .click();
-    const linksNav = page.getByRole("link", { name: /^links$/i }).first();
+    // Sections start open, so "Dynamic Links" is a direct link under LINKS.
+    const linksNav = page
+      .getByLabel("Main navigation")
+      .getByRole("link", { name: "Dynamic Links" });
     await expect(linksNav).toBeVisible({ timeout: 10_000 });
     await linksNav.click();
 
@@ -30,11 +33,13 @@ test.describe("Sidebar Navigation", () => {
   test("navigates to settings page", async ({ authenticatedPage: page }) => {
     await page.goto("/dashboard");
 
-    const settingsNav = page.getByRole("link", { name: /settings/i }).first();
-    await expect(settingsNav).toBeVisible({ timeout: 10_000 });
-    await settingsNav.click();
+    const teamNav = page
+      .getByLabel("Main navigation")
+      .getByRole("link", { name: "Team" });
+    await expect(teamNav).toBeVisible({ timeout: 10_000 });
+    await teamNav.click();
 
-    await page.waitForURL("**/settings**", { timeout: 10_000 });
+    await page.waitForURL("**/settings/team**", { timeout: 10_000 });
   });
 
   test("project switcher shows project name", async ({

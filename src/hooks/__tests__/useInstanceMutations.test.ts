@@ -127,6 +127,7 @@ describe("useInstanceMutations", () => {
       ]);
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["instances"],
+        exact: true,
       });
     });
   });

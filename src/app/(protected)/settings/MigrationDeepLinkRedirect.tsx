@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * Listens for legacy migration deep-links on `/settings` and forwards them to
- * the canonical migration card on `/link_behaviour/domain`.
+ * the canonical migration card on `/dynamic_links/settings/domain`.
  *
  * Triggers when either:
  * - `?tab=migration` is present in the query string, OR
@@ -18,7 +18,12 @@ import { useRouter, useSearchParams } from "next/navigation";
  * Note: Next.js `useSearchParams` does not expose the URL fragment, so we
  * read `window.location.hash` directly for the hash case.
  */
-const MigrationDeepLinkRedirect = () => {
+const MigrationDeepLinkRedirect = ({
+  fallback,
+}: {
+  // Where to send the visitor when it isn't a migration link.
+  fallback?: string;
+}) => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -27,7 +32,25 @@ const MigrationDeepLinkRedirect = () => {
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     const hashRequestsMigration = hash.toLowerCase().includes("migration");
 
-    if (tab !== "migration" && !hashRequestsMigration) return;
+    if (tab !== "migration" && !hashRequestsMigration) {
+      // Legacy Stripe cancel URL `/settings?cancel=true<instance id>` belongs on Usage & Billing.
+      const cancel = searchParams.get("cancel");
+      if (fallback && cancel?.startsWith("true")) {
+        const params = new URLSearchParams();
+        const instanceId = searchParams.get("instance_id") || cancel.slice(4);
+        if (instanceId) params.set("instance_id", instanceId);
+        const envType = searchParams.get("env_type");
+        if (envType) params.set("env_type", envType);
+        params.set("cancel", "true");
+        router.replace(`/settings/usage?${params}`);
+        return;
+      }
+      if (fallback) {
+        const query = searchParams.toString();
+        router.replace(`${fallback}${query ? `?${query}` : ""}`);
+      }
+      return;
+    }
 
     const preservedKeys = ["instance_id", "env_type"] as const;
     const preserved = new URLSearchParams();
@@ -37,12 +60,12 @@ const MigrationDeepLinkRedirect = () => {
     });
 
     const query = preserved.toString();
-    const target = `/link_behaviour/domain${
+    const target = `/dynamic_links/settings/domain${
       query ? `?${query}` : ""
     }#migration`;
 
     router.replace(target);
-  }, [router, searchParams]);
+  }, [router, searchParams, fallback]);
 
   return null;
 };

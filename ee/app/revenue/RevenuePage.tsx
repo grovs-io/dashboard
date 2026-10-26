@@ -22,7 +22,16 @@ import { useTableParams } from "@/hooks/useTableParams";
 import type { RevenueMetrics } from "@ee/components/revenue/RevenueTableColumns";
 import type { GetRevenueParams } from "@/types";
 import { Button } from "@/components/ui/button";
-import { DollarSign, BarChart3, Users, Repeat, Store } from "lucide-react";
+import RevenueSettingsDialog from "@ee/components/revenue/RevenueSettingsDialog";
+import { useIsInstanceAdmin } from "@/hooks/useIsInstanceAdmin";
+import {
+  DollarSign,
+  BarChart3,
+  Users,
+  Repeat,
+  Store,
+  Settings2,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 const RevenuePage = () => {
   const { resolvedTheme } = useTheme();
@@ -147,17 +156,20 @@ const RevenuePage = () => {
     // "ltv",
   ]);
 
-  const handleEnableRevenueTracking = async () => {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const admin = useIsInstanceAdmin();
+
+  const setRevenueTracking = async (enabled: boolean) => {
     if (!selectedInstance) return;
     const dataObject = {
-      revenue_collection_enabled: true,
+      revenue_collection_enabled: enabled,
     };
     try {
       await revenueCollectionMutation.mutateAsync({
         id: selectedInstance.id,
         data: dataObject,
       });
-      setRevenueEnabled(true);
+      setRevenueEnabled(enabled);
     } catch (error) {
       showErrorNotification(
         error instanceof ApiError
@@ -202,12 +214,12 @@ const RevenuePage = () => {
               <Button
                 size="lg"
                 className="px-8"
-                onClick={() => handleEnableRevenueTracking()}
+                onClick={() => setRevenueTracking(true)}
               >
                 Enable Revenue Tracking
               </Button>
               <p className="text-[11px] text-muted-foreground/50 mt-2.5">
-                You can disable this anytime in project settings
+                You can turn this off anytime in this page’s Settings
               </p>
             </div>
 
@@ -274,6 +286,14 @@ const RevenuePage = () => {
       {revenueEnabled === true && (
         <>
           <AppHeader />
+          <RevenueSettingsDialog
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            admin={admin}
+            enabled
+            saving={revenueCollectionMutation.isPending}
+            onSave={setRevenueTracking}
+          />
           <div className="flex flex-1 flex-col overflow-hidden">
             <div className="@container/main flex flex-1 flex-col gap-2 overflow-hidden">
               <div className="flex flex-col gap-2 px-6 md:gap-6 md:py-3 h-full overflow-hidden">
@@ -304,6 +324,13 @@ const RevenuePage = () => {
                       setDate={setDateRange}
                       minDate={retentionMin}
                     />
+                    <Button
+                      variant="outline"
+                      onClick={() => setSettingsOpen(true)}
+                    >
+                      <Settings2 className="size-4" />
+                      Settings
+                    </Button>
                   </div>
                 </div>
 

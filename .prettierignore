@@ -3,3 +3,4 @@ node_modules
 out
 build
 coverage
+ee/lib/__tests__/fixtures/in-app-shared/

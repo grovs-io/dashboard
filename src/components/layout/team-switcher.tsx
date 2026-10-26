@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDown, GalleryVerticalEnd, Plus, Search } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Search } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -22,12 +22,15 @@ import { useCreateInstanceMutation } from "@/hooks/mutations/useInstanceMutation
 import { useInstancesQuery } from "@/hooks/queries/useInstanceQueries";
 import type { Instance } from "@/types";
 import ProjectFormDialog from "../sidebar/ProjectFormDialog";
+import { ProjectIcon } from "./project-icon";
 import InviteLinkDialog, {
   type InviteLink,
   inviteLinksFromCreateResponse,
 } from "@/components/settings/InviteLinkDialog";
 import { IS_SELF_HOSTED } from "@/lib/edition";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { setupHref } from "@/components/onboarding/setupRules";
 import { showGenericError } from "@/lib/Notifications";
 import { trackEvent, EVENTS } from "@/analytics";
 
@@ -35,6 +38,8 @@ export function ProjectSwitcher() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [inviteLinks, setInviteLinks] = useState<InviteLink[] | null>(null);
+  const [setupAfterInvite, setSetupAfterInvite] = useState<string | null>(null);
+  const router = useRouter();
 
   const { setSelectedInstance, selectedInstance } = useProjectSelection();
   const { fetchCurrentUser } = useUserContext();
@@ -42,6 +47,11 @@ export function ProjectSwitcher() {
   const { data: instances } = useInstancesQuery();
 
   const createInstanceMutation = useCreateInstanceMutation();
+
+  // Load the setup page's code while the form is filled in, so the jump after Create is instant.
+  useEffect(() => {
+    if (dialogOpen) router.prefetch("/setup");
+  }, [dialogOpen, router]);
 
   const { isMobile } = useSidebar();
   const handleSelectInstance = (instance: Instance) => {
@@ -70,14 +80,14 @@ export function ProjectSwitcher() {
       setSelectedInstance(instance);
       const links = inviteLinksFromCreateResponse(response.data.invite_urls);
       if (links) setInviteLinks(links);
-      try {
-        // Without this the cached roles lack the new instance and AdminOnlyDisplay hides everything.
-        await fetchCurrentUser();
-      } catch {
-        // silently ignore fetchCurrentUser failure
-      }
-      // No need to manually refetch instances — the mutation auto-invalidates the query
+      // Without this the cached roles lack the new instance and AdminOnlyDisplay hides everything.
+      // Awaiting it also lets the URL pick up the new project first; a later
+      // replaceState would cancel the push below.
+      await fetchCurrentUser().catch(() => {});
       setDialogOpen(false);
+      // A new project goes straight into its guided setup, after any invite links are seen.
+      if (links) setSetupAfterInvite(String(instance.id));
+      else router.push(setupHref(instance.id));
     } catch {
       showGenericError();
     }
@@ -96,9 +106,12 @@ export function ProjectSwitcher() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="bg-blue-500/10 text-foreground dark:bg-blue-400/10 flex aspect-square size-8 items-center justify-center rounded-lg">
-                <GalleryVerticalEnd className="size-4" />
-              </div>
+              <ProjectIcon
+                url={selectedInstance?.icon_url}
+                name={
+                  selectedInstance?.production?.name ?? selectedInstance?.name
+                }
+              />
               <div className="grid min-w-0 flex-1 text-left leading-tight">
                 <span className="truncate text-sm font-semibold tracking-tight">
                   {selectedInstance?.production?.name ?? selectedInstance?.name}
@@ -160,17 +173,33 @@ export function ProjectSwitcher() {
                         .toLowerCase()
                         .includes(searchTerm.toLowerCase())
                 )
-                .map((project: Instance) => (
-                  <DropdownMenuItem
-                    key={project.id}
-                    onClick={() => handleSelectInstance(project)}
-                    className="gap-2 overflow-hidden p-2"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {project.production?.name ?? project.name}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+                .map((project: Instance) => {
+                  const current = project.id === selectedInstance?.id;
+                  return (
+                    <DropdownMenuItem
+                      key={project.id}
+                      onClick={() => handleSelectInstance(project)}
+                      aria-current={current ? "true" : undefined}
+                      className={
+                        current
+                          ? "gap-2.5 overflow-hidden bg-muted p-2 font-medium focus:bg-muted"
+                          : "gap-2.5 overflow-hidden p-2 focus:bg-muted"
+                      }
+                    >
+                      <ProjectIcon
+                        url={project.icon_url}
+                        name={project.production?.name ?? project.name}
+                        className="size-6 text-[11px]"
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {project.production?.name ?? project.name}
+                      </span>
+                      {current && (
+                        <Check className="size-4 shrink-0 text-[var(--chart-users)]" />
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
               {(instances?.length ?? 0) > 10 &&
                 searchTerm !== "" &&
                 instances?.filter((project: Instance) =>
@@ -194,7 +223,12 @@ export function ProjectSwitcher() {
         {IS_SELF_HOSTED && (
           <InviteLinkDialog
             links={inviteLinks}
-            onOpenChange={(open) => !open && setInviteLinks(null)}
+            onOpenChange={(open) => {
+              if (open) return;
+              setInviteLinks(null);
+              if (setupAfterInvite) router.push(setupHref(setupAfterInvite));
+              setSetupAfterInvite(null);
+            }}
           />
         )}
       </SidebarMenuItem>

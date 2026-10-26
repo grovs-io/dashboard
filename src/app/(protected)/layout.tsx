@@ -6,17 +6,21 @@ import ProtectedRoute from "@/lib/ProtectedRoute";
 import ClientLayout from "./ClientLayout";
 import { ProjectSelectionProvider } from "@/context/useProjectSelection";
 import React, { Suspense } from "react";
+import { usePathname } from "next/navigation";
 import { ContentSkeleton } from "@/components/common/PageSkeleton";
 
 import CreateCampaignGlobalDialogProvider from "@/context/useCreateCampaignDialogContext";
 import LinkDialogProvider from "@/context/useLinkDialogContext";
 import { ChatwootProvider } from "@/context/useChatwoot";
+import GithubStarCard from "@/components/layout/GithubStarCard";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // The guided setup takes the whole screen, without sidebar or header.
+  const fullScreen = usePathname()?.startsWith("/setup") ?? false;
   return (
     <ProtectedRoute>
       <a
@@ -30,16 +34,25 @@ export default function DashboardLayout({
           <CreateCampaignGlobalDialogProvider>
             <ChatwootProvider>
               <ClientLayout>
-                <SidebarProvider>
-                  <AppSidebar />
-                  <SidebarInset>
-                    <main id="main-content">
-                      <Suspense fallback={<ContentSkeleton />}>
-                        {children}
-                      </Suspense>
-                    </main>
-                  </SidebarInset>
-                </SidebarProvider>
+                {fullScreen ? (
+                  <main id="main-content">
+                    <Suspense fallback={<ContentSkeleton />}>
+                      {children}
+                    </Suspense>
+                  </main>
+                ) : (
+                  <SidebarProvider>
+                    <AppSidebar />
+                    <SidebarInset>
+                      <main id="main-content">
+                        <Suspense fallback={<ContentSkeleton />}>
+                          {children}
+                        </Suspense>
+                      </main>
+                    </SidebarInset>
+                  </SidebarProvider>
+                )}
+                {!fullScreen && <GithubStarCard />}
               </ClientLayout>
             </ChatwootProvider>
           </CreateCampaignGlobalDialogProvider>

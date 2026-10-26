@@ -28,6 +28,11 @@ export interface GetLinksParams {
   platform?: string;
 }
 
+export interface LinksLookupParams {
+  term?: string;
+  limit?: number;
+}
+
 export type GetVisitorsParams = PaginatedQuery;
 
 export interface GetCampaignsParams {
@@ -39,6 +44,7 @@ export interface GetCampaignsParams {
   per_page: number;
   term?: string;
   end_date?: string;
+  platform?: string;
 }
 
 export interface GetRevenueParams {
@@ -52,19 +58,16 @@ export interface GetRevenueParams {
   platform?: string;
 }
 
-export interface GetMessagingParams {
-  page: number;
-  for_new_users: boolean | null;
-  archived: boolean;
-  term?: string;
-}
-
 // ─── Analytics param types ────────────────────────────────────────
+
+export type AnalyticsGranularity = "day" | "week" | "month";
 
 export interface AnalyticsDateRangeParams {
   start_date?: string;
   end_date?: string;
   platform?: string;
+  /** JSON-encoded filter array — the same contract as the Events explorer. */
+  filters?: string;
 }
 
 export interface AnalyticsEventsParams extends AnalyticsDateRangeParams {
@@ -73,7 +76,6 @@ export interface AnalyticsEventsParams extends AnalyticsDateRangeParams {
   search?: string;
   sort_by?: string;
   sort_order?: "asc" | "desc";
-  filters?: string; // JSON-encoded EventFilter[]
   /** IANA zone the retention and range-cap guards judge the range in. */
   timezone?: string;
 }
@@ -81,7 +83,6 @@ export interface AnalyticsEventsParams extends AnalyticsDateRangeParams {
 export interface AnalyticsEventVolumeParams extends AnalyticsDateRangeParams {
   bucket?: "hour" | "day" | "week";
   search?: string;
-  filters?: string;
   /** IANA zone the buckets are cut in, e.g. "Europe/Bucharest". */
   timezone?: string;
 }
@@ -97,12 +98,12 @@ export interface AnalyticsFieldValuesParams {
 
 export interface AnalyticsOverviewParams extends AnalyticsDateRangeParams {
   search?: string;
-  /** JSON-encoded filter array — unified filter contract shared with the Events explorer. */
-  filters?: string;
+  granularity?: AnalyticsGranularity;
 }
 
 export interface OverviewKeyMetricSeriesParams extends AnalyticsDateRangeParams {
   metric: string;
+  granularity?: AnalyticsGranularity;
 }
 
 export interface AnalyticsRetentionSummaryParams {
@@ -110,4 +111,8 @@ export interface AnalyticsRetentionSummaryParams {
   end_date?: string;
   platform?: string;
   filters?: string;
+}
+
+export interface GetSegmentsParams {
+  archived: boolean;
 }

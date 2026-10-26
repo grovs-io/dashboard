@@ -81,7 +81,8 @@ export function useOverviewVersionFunnelQuery(
 
 export function useOverviewUserTrendsQuery(
   projectId: string | undefined,
-  params?: AnalyticsOverviewParams
+  params?: AnalyticsOverviewParams,
+  enabled = true
 ) {
   return useQuery<UserTrendsResponse>({
     queryKey: queryKeys.projects.analyticsOverviewUserTrends(
@@ -92,7 +93,7 @@ export function useOverviewUserTrendsQuery(
       const response = await getOverviewUserTrendsAPICall(projectId!, params);
       return response.data;
     },
-    enabled: !!projectId,
+    enabled: enabled && !!projectId,
   });
 }
 

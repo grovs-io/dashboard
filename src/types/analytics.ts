@@ -163,6 +163,8 @@ export interface OverviewKeyMetrics {
 
 export interface OverviewKeyMetricsResponse {
   metrics: OverviewKeyMetrics;
+  /** Metric keys the backend could not honour for the active filters (returned as 0). */
+  unsupported_metrics?: string[];
 }
 
 /** Count metrics chartable via /key-metrics/series (user-classification metrics
@@ -186,6 +188,8 @@ export interface KeyMetricSeriesPoint {
 export interface KeyMetricSeriesResponse {
   metric: string;
   points: KeyMetricSeriesPoint[];
+  /** The metric can't honour the request's filters; points are meaningless. */
+  unsupported?: boolean;
 }
 
 // ─── Retention ────────────────────────────────────────────────────
@@ -198,6 +202,10 @@ export interface RetentionSummaryResponse {
   day_1: number | null;
   day_7: number | null;
   day_30: number | null;
-  sparkline: { day: number; rate: number }[];
+  /** Users behind each rate; absent on older backends. */
+  day_1_users?: number;
+  day_7_users?: number;
+  day_30_users?: number;
+  sparkline: { date: string; rate: number | null }[];
   median_churn_day: number | null;
 }

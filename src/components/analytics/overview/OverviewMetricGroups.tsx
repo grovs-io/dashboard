@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  CircleDollarSign,
   RotateCcw,
   TrendingDown,
   TrendingUp,
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyFromCents } from "@/utils/formatCurrency";
 import type { MetricsOverview, RetentionSummaryResponse } from "@/types";
+import { numberFormatter, pct } from "./metricFormat";
 
 type MetricMeta = { title: string; valueType?: "money" | "percent" };
 
@@ -35,19 +37,24 @@ const REVENUE_KEYS = new Set([
   "cancellations",
 ]);
 
-const GROUPS: { group: string; keys: string[] }[] = [
-  { group: "Acquisition", keys: ["link_views", "installs", "cancellations"] },
-  {
-    group: "Engagement",
-    keys: ["app_opens", "returning_users", "returning_rate"],
-  },
-  {
-    group: "Revenue",
-    keys: ["arpu", "arppu", "units_sold", "first_time_purchases"],
-  },
-];
+export type MetricGroupKey =
+  | "acquisition"
+  | "engagement"
+  | "revenue"
+  | "retention";
 
-const numberFormatter = new Intl.NumberFormat("de-DE");
+const GROUP_LABELS: Record<MetricGroupKey, string> = {
+  acquisition: "Acquisition",
+  engagement: "Engagement",
+  revenue: "Revenue",
+  retention: "Retention",
+};
+
+const GROUP_KEYS: Record<Exclude<MetricGroupKey, "retention">, string[]> = {
+  acquisition: ["link_views", "installs", "cancellations"],
+  engagement: ["app_opens", "returning_users", "returning_rate"],
+  revenue: ["arpu", "arppu", "units_sold", "first_time_purchases"],
+};
 
 function formatValue(key: string, value: number): string {
   const t = META[key]?.valueType;
@@ -56,30 +63,61 @@ function formatValue(key: string, value: number): string {
   return numberFormatter.format(value);
 }
 
-function delta(cur: number, prev: number): number {
-  if (!prev) return 0;
-  return Math.round(((cur - prev) / Math.abs(prev)) * 100);
-}
-
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${Math.round(v)}%`;
 }
 
-type Row = { label: string; value: string; delta?: number };
+function retentionRow(
+  day: number,
+  rate: number | null,
+  users: number | undefined
+): Row {
+  const row: Row = { label: `Day ${day}`, value: fmtPct(rate) };
+  if (rate == null) {
+    row.title = `No users reached day ${day} in this range.`;
+    return row;
+  }
+  row.title = `Users active exactly ${day} ${day === 1 ? "day" : "days"} after their first visit, among those whose day ${day} falls in this range.`;
+  if (users)
+    row.hint = `${numberFormatter.format(users)} ${users === 1 ? "user" : "users"}`;
+  return row;
+}
+
+type Row = {
+  label: string;
+  value: string;
+  delta?: number;
+  hint?: string;
+  title?: string;
+};
 type GroupEmpty = {
   icon: LucideIcon;
   title: string;
   description: string;
 };
-type Group = { group: string; rows: Row[]; empty?: GroupEmpty };
+type GroupContent = { rows: Row[]; empty?: GroupEmpty };
 
-function MetricRow({ label, value, change }: Row & { change?: number }) {
+function MetricRow({
+  label,
+  value,
+  change,
+  hint,
+  title,
+}: Row & { change?: number }) {
   const show = change != null && change !== 0;
   const Trend = change != null && change < 0 ? TrendingDown : TrendingUp;
   return (
-    <div className="flex items-baseline justify-between border-b border-sidebar-border/70 py-[7px] last:border-b-0">
+    <div
+      className="flex items-baseline justify-between border-b border-sidebar-border/70 py-[7px] last:border-b-0"
+      title={title}
+    >
       <span className="text-[13px] text-muted-foreground">{label}</span>
       <span className="flex items-baseline gap-1.5">
+        {hint && (
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {hint}
+          </span>
+        )}
         <span className="text-[15px] font-semibold tabular-nums">{value}</span>
         {show && (
           <span
@@ -135,6 +173,139 @@ function hasRetention(
   );
 }
 
+const REVENUE_OFF: GroupEmpty = {
+  icon: CircleDollarSign,
+  title: "Revenue isn't tracked",
+  description:
+    "Turn on revenue collection for this instance to see revenue per user, units sold and purchasers.",
+};
+
+function metricRows(
+  keys: string[],
+  metrics: MetricsOverview | undefined,
+  revenueEnabled: boolean
+): Row[] {
+  return keys
+    .filter((k) => revenueEnabled || !REVENUE_KEYS.has(k))
+    .map((k) => {
+      const cur = metrics?.current[k] ?? 0;
+      const prev = metrics?.previous[k] ?? 0;
+      return {
+        label: META[k]?.title ?? k,
+        value: formatValue(k, cur),
+        delta: pct(cur, prev),
+      };
+    });
+}
+
+function groupContent(
+  group: MetricGroupKey,
+  metrics: MetricsOverview | undefined,
+  retention: RetentionSummaryResponse | undefined,
+  revenueEnabled: boolean
+): GroupContent {
+  const retentionHasData = hasRetention(retention) && !!retention;
+  if (group === "retention") {
+    if (retentionHasData) {
+      return {
+        rows: [
+          retentionRow(1, retention.day_1, retention.day_1_users),
+          retentionRow(7, retention.day_7, retention.day_7_users),
+          retentionRow(30, retention.day_30, retention.day_30_users),
+        ],
+      };
+    }
+    return {
+      rows: [],
+      empty: {
+        icon: RotateCcw,
+        title: "No retention cohorts yet",
+        description:
+          "Retention needs users to come back after their first session. Keep tracking active and check a later date range.",
+      },
+    };
+  }
+  if (group === "revenue" && !revenueEnabled)
+    return { rows: [], empty: REVENUE_OFF };
+  if (group !== "engagement")
+    return { rows: metricRows(GROUP_KEYS[group], metrics, revenueEnabled) };
+
+  // Median churn sits under Engagement; Retention keeps the D1/D7/D30 rates.
+  const rows = hasEngagement(metrics)
+    ? metricRows(GROUP_KEYS.engagement, metrics, revenueEnabled)
+    : [];
+  if (retentionHasData) {
+    const churn = retention.median_churn_day;
+    rows.push({
+      label: "Median churn",
+      value: churn == null ? "—" : `${churn} ${churn === 1 ? "day" : "days"}`,
+    });
+    return { rows };
+  }
+  if (rows.length) return { rows };
+  return {
+    rows,
+    empty: {
+      icon: Activity,
+      title: "No engagement recorded",
+      description:
+        "Open the app with this instance's SDK active, then refresh this range once activity has been tracked.",
+    },
+  };
+}
+
+/** One metric group's rows (no heading), shared by the Overview grid and panel widgets. */
+export function MetricGroupPanel({
+  group,
+  metrics,
+  retention,
+  revenueEnabled,
+  loading,
+}: {
+  group: MetricGroupKey;
+  metrics: MetricsOverview | undefined;
+  retention?: RetentionSummaryResponse;
+  revenueEnabled: boolean;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3.5 py-[7px]">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4">
+            <Skeleton className="h-3.5 w-28" />
+            <div className="flex items-center gap-1.5">
+              <Skeleton className="h-5 w-14" />
+              <Skeleton className="h-5 w-11 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const { rows, empty } = groupContent(
+    group,
+    metrics,
+    retention,
+    revenueEnabled
+  );
+  if (empty) return <MetricGroupEmpty {...empty} />;
+  return (
+    <div>
+      {rows.map((r) => (
+        <MetricRow
+          key={r.label}
+          label={r.label}
+          value={r.value}
+          change={r.delta}
+          hint={r.hint}
+          title={r.title}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function OverviewMetricGroups({
   metrics,
   revenueEnabled,
@@ -146,66 +317,9 @@ export function OverviewMetricGroups({
   retention?: RetentionSummaryResponse;
   loading?: boolean;
 }) {
-  const loadingGroups = revenueEnabled
-    ? ["Acquisition", "Engagement", "Revenue", "Retention"]
-    : ["Acquisition", "Engagement", "Retention"];
-  const engagementHasData = hasEngagement(metrics);
-  const retentionHasData = hasRetention(retention);
-  const groups: Group[] = GROUPS.map((g) => ({
-    group: g.group,
-    rows: g.keys
-      .filter((k) => revenueEnabled || !REVENUE_KEYS.has(k))
-      .map((k) => {
-        const cur = metrics?.current[k] ?? 0;
-        const prev = metrics?.previous[k] ?? 0;
-        return {
-          label: META[k]?.title ?? k,
-          value: formatValue(k, cur),
-          delta: delta(cur, prev),
-        };
-      }),
-  })).filter((g) => g.rows.length > 0);
-
-  const engagement = groups.find((g) => g.group === "Engagement");
-  if (engagement && !engagementHasData) {
-    engagement.rows = [];
-    engagement.empty = {
-      icon: Activity,
-      title: "No engagement recorded",
-      description:
-        "Open the app with this instance's SDK active, then refresh this range once activity has been tracked.",
-    };
-  }
-
-  if (retentionHasData && retention) {
-    const churn = retention.median_churn_day;
-    const churnValue =
-      churn == null ? "—" : `${churn} ${churn === 1 ? "day" : "days"}`;
-    // Median churn sits under Engagement; Retention keeps the D1/D7/D30 rates.
-    if (engagement) {
-      engagement.rows.push({ label: "Median churn", value: churnValue });
-      engagement.empty = undefined;
-    }
-    groups.push({
-      group: "Retention",
-      rows: [
-        { label: "Day 1", value: fmtPct(retention.day_1) },
-        { label: "Day 7", value: fmtPct(retention.day_7) },
-        { label: "Day 30", value: fmtPct(retention.day_30) },
-      ],
-    });
-  } else {
-    groups.push({
-      group: "Retention",
-      rows: [],
-      empty: {
-        icon: RotateCcw,
-        title: "No retention cohorts yet",
-        description:
-          "Retention needs users to come back after their first session. Keep tracking active and check a later date range.",
-      },
-    });
-  }
+  const groups: MetricGroupKey[] = revenueEnabled
+    ? ["acquisition", "engagement", "revenue", "retention"]
+    : ["acquisition", "engagement", "retention"];
 
   return (
     <div className="overflow-hidden rounded-xl border border-sidebar-border bg-background">
@@ -215,47 +329,20 @@ export function OverviewMetricGroups({
           revenueEnabled ? "@4xl/main:grid-cols-4" : "@4xl/main:grid-cols-3"
         )}
       >
-        {loading
-          ? loadingGroups.map((group) => (
-              <div key={group} className="p-5">
-                <div className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                  {group}
-                </div>
-                <div className="flex flex-col gap-3.5 py-[7px]">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between gap-4"
-                    >
-                      <Skeleton className="h-3.5 w-28" />
-                      <div className="flex items-center gap-1.5">
-                        <Skeleton className="h-5 w-14" />
-                        <Skeleton className="h-5 w-11 rounded-full" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          : groups.map((g) => (
-              <div key={g.group} className="p-5">
-                <div className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                  {g.group}
-                </div>
-                {g.empty ? (
-                  <MetricGroupEmpty {...g.empty} />
-                ) : (
-                  g.rows.map((r) => (
-                    <MetricRow
-                      key={r.label}
-                      label={r.label}
-                      value={r.value}
-                      change={r.delta}
-                    />
-                  ))
-                )}
-              </div>
-            ))}
+        {groups.map((g) => (
+          <div key={g} className="p-5">
+            <div className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              {GROUP_LABELS[g]}
+            </div>
+            <MetricGroupPanel
+              group={g}
+              metrics={metrics}
+              retention={retention}
+              revenueEnabled={revenueEnabled}
+              loading={loading}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );

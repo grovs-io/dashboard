@@ -10,9 +10,17 @@ vi.mock("@/hooks/queries/useConfigurationQueries", () => ({
   useCustomDomainPreflightQuery: vi.fn(),
 }));
 
-vi.mock("@/lib/edition", () => ({
+const edition = vi.hoisted(() => ({
   IS_ENTERPRISE: false,
   IS_SELF_HOSTED: true,
+}));
+vi.mock("@/lib/edition", () => ({
+  get IS_ENTERPRISE() {
+    return edition.IS_ENTERPRISE;
+  },
+  get IS_SELF_HOSTED() {
+    return edition.IS_SELF_HOSTED;
+  },
 }));
 
 vi.mock("@/hooks/queries/usePaymentsQueries", () => ({
@@ -47,6 +55,7 @@ vi.mock("@/lib/copyTextHelper", () => ({ handleCopyText: vi.fn() }));
 vi.mock("@/lib/config", () => ({
   config: {
     pricingUrl: "https://example.com/pricing",
+    salesUrl: "https://example.com/sales",
     supportEmail: "support@example.com",
   },
 }));
@@ -109,6 +118,7 @@ function setSubscription(subscription: unknown) {
 
 describe("CustomDomainSetup", () => {
   beforeEach(() => {
+    edition.IS_SELF_HOSTED = true;
     vi.clearAllMocks();
     mockedProjectSelection.mockReturnValue({
       selectedInstance: { id: "inst-1" },
@@ -304,6 +314,7 @@ describe("CustomDomainSetup", () => {
   });
 
   it("opens the dialog to the upsell when there is no paid plan", () => {
+    edition.IS_SELF_HOSTED = false;
     setQuery({ data: [] });
     setSubscription(null);
     renderWithClient(<CustomDomainSetup projectId="p1" />);
@@ -313,7 +324,23 @@ describe("CustomDomainSetup", () => {
     expect(screen.getByText(/requires a paid plan/i)).toBeInTheDocument();
   });
 
+  it("opens the dialog to the upsell when the subscription has a payment issue", () => {
+    edition.IS_SELF_HOSTED = false;
+    setQuery({ data: [] });
+    setSubscription({
+      type: "stripe",
+      payment_issue: true,
+      status: "past_due",
+    });
+    renderWithClient(<CustomDomainSetup projectId="p1" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /use your own subdomain/i })
+    );
+    expect(screen.getByText(/requires a paid plan/i)).toBeInTheDocument();
+  });
+
   it("opens the Scale Up plans popup from the upsell View plans", () => {
+    edition.IS_SELF_HOSTED = false;
     setQuery({ data: [] });
     setSubscription(null);
     renderWithClient(<CustomDomainSetup projectId="p1" />);
@@ -321,8 +348,8 @@ describe("CustomDomainSetup", () => {
       screen.getByRole("button", { name: /use your own subdomain/i })
     );
     fireEvent.click(screen.getByRole("button", { name: /view plans/i }));
-    // The custom-domain modal closes and the Scale Up plans popup opens.
-    expect(screen.getByText("Scale Up")).toBeInTheDocument();
+    // The custom-domain modal closes and the plan picker popup opens.
+    expect(screen.getByText("up to 250K MAU")).toBeInTheDocument();
     expect(screen.queryByText(/requires a paid plan/i)).toBeNull();
   });
 

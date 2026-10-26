@@ -18,15 +18,13 @@ import {
 } from "@/hooks/queries/useConfigurationQueries";
 import { useMigrationSourceQuery } from "@/hooks/queries/useMigrationQueries";
 import { useSubscriptionQuery } from "@/hooks/queries/usePaymentsQueries";
-import { useCreateSubscriptionMutation } from "@/hooks/mutations/usePaymentsMutations";
 import { useProjectSelection } from "@/context/useProjectSelection";
 import { isFeatureOff } from "@/lib/apiErrorHelpers";
 import { isManualCustomDomainMode } from "@/lib/customDomainStatus";
 import { queryKeys } from "@/lib/queryKeys";
-import { ApiError } from "@/lib/ApiError";
-import { showErrorNotification } from "@/lib/Notifications";
 import { config } from "@/lib/config";
 import { Skeleton } from "@/components/ui/skeleton";
+import { hasPaidPlan as isPaidPlan } from "@/lib/plan";
 import ScaleUpDialog from "@/components/settings/ScaleUpDialog";
 import MigrationWizard from "./MigrationWizard";
 import { getHealthLabel } from "./getHealthLabel";
@@ -64,10 +62,9 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
   const [scaleUpOpen, setScaleUpOpen] = useState(false);
   const { selectedInstance } = useProjectSelection();
   const subscriptionQuery = useSubscriptionQuery(selectedInstance?.id);
-  const hasPaidPlan = !!subscriptionQuery.data?.subscription;
-  const createSubscriptionMutation = useCreateSubscriptionMutation(
-    selectedInstance?.id
-  );
+  const sub = subscriptionQuery.data?.subscription;
+  // Self-hosted has no billing; the backend entitles every project there.
+  const hasPaidPlan = isPaidPlan(sub);
   const domainsQuery = useCustomDomainsEnvelopeQuery(projectId);
   const manualMode = isManualCustomDomainMode(domainsQuery.data?.tls_mode);
   const sourceQuery = useMigrationSourceQuery(projectId);
@@ -117,14 +114,9 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
     return null;
   }
 
-  if (domainsQuery.isLoading || sourceQuery.isLoading) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-3 w-2/3" />
-      </div>
-    );
-  }
+  // Skeleton replaces only the launcher: an early return would unmount the
+  // dialog, and the wizard's own observers refetch an errored query on mount.
+  const entryLoading = domainsQuery.isLoading || sourceQuery.isLoading;
 
   const hasMigrationProgress = Boolean(migrationDomain || sourceQuery.data);
   const migrationHostname =
@@ -172,19 +164,6 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
     if (migrationIsReadyForDns) return "Ready — waiting for DNS";
     return migrationStatus.replace("_", " ");
   })();
-  const handleUpgrade = async () => {
-    try {
-      const response = await createSubscriptionMutation.mutateAsync();
-      window.location.href = response.data.url;
-    } catch (err) {
-      showErrorNotification(
-        err instanceof ApiError
-          ? err.message
-          : "Something went wrong, please try again"
-      );
-    }
-  };
-
   const handleViewPlans = () => {
     handleOpenChange(false);
     setScaleUpOpen(true);
@@ -203,7 +182,12 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
 
   return (
     <div id="migration" className="flex flex-col gap-2">
-      {hasMigrationProgress ? (
+      {entryLoading ? (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-3 w-2/3" />
+        </div>
+      ) : hasMigrationProgress ? (
         <div className="flex items-center justify-between rounded-md border border-sidebar-border bg-muted/30 px-3 py-2">
           <div className="flex items-center gap-2 min-w-0">
             <Badge variant="outline" className="gap-1.5 shrink-0">
@@ -273,11 +257,7 @@ const MigrationEntry = ({ projectId }: MigrationEntryProps) => {
           <div className="min-h-0 overflow-y-auto pr-1">{dialogBody}</div>
         </DialogContent>
       </Dialog>
-      <ScaleUpDialog
-        open={scaleUpOpen}
-        onOpenChange={setScaleUpOpen}
-        handleUpgrade={handleUpgrade}
-      />
+      <ScaleUpDialog open={scaleUpOpen} onOpenChange={setScaleUpOpen} />
     </div>
   );
 };

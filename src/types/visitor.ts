@@ -71,3 +71,9 @@ export interface VisitorDetailMetrics {
 export interface AggregatedVisitorMetrics extends AggregatedVisitor {
   number_of_generated_links?: number;
 }
+
+// Whether the visitor's device can get a push; the token itself is never sent.
+export interface VisitorPushStatus {
+  platform: string | null;
+  registered: boolean;
+}

@@ -38,7 +38,7 @@ type ProjectFormDialogProps = {
   handleCreateProject: (
     projectName: string,
     members: { email: string; role: string }[]
-  ) => void;
+  ) => void | Promise<void>;
 };
 
 const ProjectFormDialog = ({
@@ -68,8 +68,8 @@ const ProjectFormDialog = ({
     append({ email: "", role: MEMBER_ROLE });
   };
 
-  const onSubmit = (data: CreateProjectFormValues) => {
-    handleCreateProject(data.name, data.members);
+  const onSubmit = async (data: CreateProjectFormValues) => {
+    await handleCreateProject(data.name, data.members);
   };
 
   useEffect(() => {
@@ -279,11 +279,13 @@ const ProjectFormDialog = ({
               {/* Submit */}
               <Button
                 type="submit"
-                disabled={!form.formState.isValid}
+                disabled={
+                  !form.formState.isValid || form.formState.isSubmitting
+                }
                 className="w-full rounded-lg"
                 variant="default"
               >
-                Create project
+                {form.formState.isSubmitting ? "Creating…" : "Create project"}
               </Button>
             </div>
           </form>

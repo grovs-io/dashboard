@@ -1,3 +1,7 @@
+/** Gradle Kotlin DSL dependency line for the Android SDK. */
+export const androidGradleDependency = (version?: string | null) =>
+  `implementation("io.grovs:Grovs:${version ?? "LATEST_VERSION"}")`;
+
 export const sdkAndroidValue = `import io.grovs.Grovs
 class MainApplication : Application() {
 
@@ -56,3 +60,27 @@ listener.remove(); // Stop receiving events
 
 
 `;
+
+const appLinkFilter = (
+  host: string | undefined | null
+) => `<intent-filter android:autoVerify="true">
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="https" android:host="${host}" />
+</intent-filter>`;
+
+// Scheme filter, then one app-link filter per host (production hosts first, then test).
+export const intentFiltersXml = (
+  uriScheme: string | undefined,
+  hosts: (string | null | undefined)[]
+) =>
+  [
+    `<intent-filter>
+  <data android:scheme="${uriScheme ?? "YOUR_URI_SCHEME"}" android:host="open" />
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+</intent-filter>`,
+    ...hosts.map(appLinkFilter),
+  ].join("\n\n") + "\n";

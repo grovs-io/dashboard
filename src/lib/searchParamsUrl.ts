@@ -21,5 +21,7 @@ export function writeSearchParams(
     ? `${window.location.pathname}?${qs}`
     : window.location.pathname;
 
+  // A no-op replace would still cancel a router.push that is in flight.
+  if (url === `${window.location.pathname}${window.location.search}`) return;
   window.history.replaceState(null, "", url);
 }

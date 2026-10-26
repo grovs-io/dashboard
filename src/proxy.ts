@@ -7,9 +7,17 @@ import { buildContentSecurityPolicy } from "@/lib/contentSecurityPolicy";
 const aliasMap: Record<string, string> = {
   "/new-password": "/new_password",
   "/links": "/dynamic_links/links",
-  "/settings/subscription": "/settings",
+  "/settings/subscription": "/settings/usage",
   // The Overview is now the dashboard; keep old links/bookmarks working.
   "/analytics/overview": "/dashboard",
+  // Links Behaviour split up. Banners first: the prefix loop runs in insertion
+  // order, so /smart_banners/new must not hit the /link_behaviour entry.
+  "/link_behaviour/smart_banners": "/smart_banners",
+  "/link_behaviour": "/dynamic_links/settings",
+  "/developers": "/settings/developers",
+  "/audit_logs": "/settings/audit_logs",
+  // Legacy messaging was replaced by In-App messages.
+  "/messaging": "/in_app",
   // add more one-to-one aliases here
 };
 
@@ -60,6 +68,9 @@ export function proxy(request: NextRequest) {
           !IS_SELF_HOSTED &&
           Boolean(process.env.NEXT_PUBLIC_CHATWOOT_URL) &&
           Boolean(process.env.NEXT_PUBLIC_CHATWOOT_TOKEN),
+        stripeEnabled:
+          !IS_SELF_HOSTED &&
+          Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
       })
     );
   }

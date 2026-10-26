@@ -15,7 +15,7 @@ const AuditLogsPage = () => {
 
   useEffect(() => {
     if (!isResolving && selectedInstance && !allowed) {
-      router.replace("/settings");
+      router.replace("/settings/team");
     }
   }, [allowed, isResolving, selectedInstance, router]);
 

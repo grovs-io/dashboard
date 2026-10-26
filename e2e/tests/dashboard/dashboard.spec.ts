@@ -1,4 +1,5 @@
 import { test, expect } from "../../fixtures/base-fixtures";
+import { mockDashboards } from "../../fixtures/api-mocks";
 
 test.describe("Dashboard", () => {
   test("loads and displays metric cards", async ({
@@ -35,5 +36,18 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/top links/i).first()).toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test("renders a custom dashboard's metric and panel widgets", async ({
+    authenticatedPage: page,
+  }) => {
+    await mockDashboards(page);
+    await page.goto("/dashboard?board=1");
+
+    await expect(page.getByText("Installs by country")).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText("Romania")).toBeVisible();
+    await expect(page.getByText("Retention").first()).toBeVisible();
   });
 });

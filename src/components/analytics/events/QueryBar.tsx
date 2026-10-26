@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Search,
   X,
@@ -40,34 +40,11 @@ import {
   useAnalyticsEventFieldsQuery,
   useAnalyticsEventFieldValuesQuery,
 } from "@/hooks/queries/useAnalyticsEventsQueries";
+import { FIELD_LABELS, toLabel } from "@/lib/filterLabels";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { QueryFilter } from "./types";
 
 type FilterOperator = QueryFilter["operator"];
-
-const FIELD_LABELS: Record<string, string> = {
-  event_type: "Event Type",
-  event_name: "Event Name",
-  screen_name: "Screen",
-  visitor: "User",
-  visitor_id: "User",
-  session_id: "Session",
-  platform: "Platform",
-  app_version: "Version",
-  device_model: "Device",
-  os: "OS",
-  os_version: "OS Version",
-  country: "Country",
-  city: "City",
-  tracking_source: "Source",
-  tracking_medium: "Medium",
-  tracking_campaign: "UTM Campaign",
-  campaign: "Campaign",
-  campaign_id: "Campaign",
-  link: "Link",
-  link_id: "Link",
-  ads_platform: "Ads Platform",
-  sdk_identifier: "SDK",
-};
 
 const FIELD_ICONS: Record<string, LucideIcon> = {
   event_type: Zap,
@@ -83,6 +60,8 @@ const FIELD_ICONS: Record<string, LucideIcon> = {
   os_version: Hash,
   country: Globe,
   city: MapPin,
+  source: Globe,
+  language: Globe,
   tracking_source: Globe,
   tracking_medium: Globe,
   tracking_campaign: Globe,
@@ -94,6 +73,8 @@ const FIELD_ICONS: Record<string, LucideIcon> = {
 
 /** Fields where the API returns {id, name} objects — query with this name, filter with mapped name */
 const ID_VALUE_FIELDS = new Set(["campaign", "link", "visitor"]);
+// Fixed category lists: backend only supports is/is_not with a listed value.
+const FIXED_VALUE_FIELDS = new Set(["source"]);
 
 /** field-values API field → filter payload field (only for fields that differ) */
 const FILTER_FIELD_MAP: Record<string, string> = {
@@ -119,13 +100,11 @@ const TOP_LEVEL_FIELDS = [
   "os_version",
   "country",
   "city",
+  "source",
+  "language",
   "campaign",
   "link",
 ];
-
-function toLabel(key: string): string {
-  return key.replace(/[_.]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 /** Strip the `user.` namespace so picker items read e.g. "Plan" under the group. */
 function userAttrLabel(name: string): string {
@@ -183,6 +162,7 @@ function FilterChip({
               : filter.value)}
       </span>
       <button
+        type="button"
         aria-label={`Remove ${FIELD_LABELS[filter.field] ?? filter.field} filter`}
         className="ml-0.5 rounded-sm hover:bg-background/20 p-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={(e) => {
@@ -208,6 +188,7 @@ export default function QueryBar({
   platformOnly = false,
 }: QueryBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [inputValue, setInputValue] = useState("");
@@ -216,7 +197,10 @@ export default function QueryBar({
     useState<FilterOperator>("is");
 
   // A disabled query still replays cached data, so platformOnly must drop the lists too.
-  const fieldsQuery = useAnalyticsEventFieldsQuery(projectId, !platformOnly);
+  const fieldsQuery = useAnalyticsEventFieldsQuery(
+    projectId,
+    !platformOnly && open
+  );
   const propertyKeys = useMemo(() => {
     if (platformOnly || !fieldsQuery.data?.fields) return [];
     return fieldsQuery.data.fields
@@ -232,11 +216,7 @@ export default function QueryBar({
   }, [fieldsQuery.data, platformOnly]);
 
   // Debounced so typing a value doesn't fire one field-values request per keystroke
-  const [debouncedInput, setDebouncedInput] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedInput(inputValue), 250);
-    return () => clearTimeout(t);
-  }, [inputValue]);
+  const debouncedInput = useDebouncedValue(inputValue, 250);
 
   const fieldValuesParams = useMemo(
     () =>
@@ -259,6 +239,7 @@ export default function QueryBar({
     setSelectedOperator("is");
   }, []);
 
+  // Also bound to click: a focused input gets no new focus event after the popover closes.
   const handleFocus = useCallback(() => {
     setOpen(true);
     if (phase === "idle") {
@@ -312,7 +293,8 @@ export default function QueryBar({
         e.key === "Enter" &&
         phase === "value" &&
         inputValue.trim() &&
-        !platformOnly
+        !platformOnly &&
+        !FIXED_VALUE_FIELDS.has(selectedField)
       ) {
         e.preventDefault();
         handleSelectValue(inputValue.trim());
@@ -381,6 +363,7 @@ export default function QueryBar({
       resetBuilder,
       handleSelectValue,
       platformOnly,
+      selectedField,
     ]
   );
 
@@ -470,11 +453,15 @@ export default function QueryBar({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
         <div
+          ref={anchorRef}
           className={cn(
             "flex items-center gap-1.5 flex-wrap min-h-10 px-3 py-1.5 rounded-md border border-input bg-background text-sm ring-offset-background cursor-text flex-1",
             open && "ring-2 ring-ring ring-offset-2"
           )}
-          onClick={() => inputRef.current?.focus()}
+          onClick={() => {
+            inputRef.current?.focus();
+            handleFocus();
+          }}
         >
           <Search className="size-4 text-muted-foreground shrink-0" />
 
@@ -491,6 +478,7 @@ export default function QueryBar({
                 {searchTerm}
               </span>
               <button
+                type="button"
                 aria-label="Clear search term"
                 className="ml-0.5 rounded-sm hover:bg-background/20 p-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={(e) => {
@@ -534,6 +522,7 @@ export default function QueryBar({
           {/* Clear all button */}
           {hasContent && (
             <button
+              type="button"
               aria-label="Clear all filters"
               className="shrink-0 p-1 rounded-sm text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={(e) => {
@@ -553,6 +542,9 @@ export default function QueryBar({
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          if (anchorRef.current?.contains(e.target as Node)) e.preventDefault();
+        }}
       >
         <Command shouldFilter={false}>
           <CommandList>
@@ -622,7 +614,7 @@ export default function QueryBar({
                   inputValue && (
                     <CommandEmpty>No matching attributes</CommandEmpty>
                   )}
-                {inputValue && !platformOnly && (
+                {inputValue && !platformOnly && onSearchTermChange && (
                   <>
                     <CommandSeparator />
                     <CommandGroup>
@@ -658,6 +650,7 @@ export default function QueryBar({
                   </span>
                 </CommandItem>
                 {!ID_VALUE_FIELDS.has(selectedField) &&
+                  !FIXED_VALUE_FIELDS.has(selectedField) &&
                   selectedField !== "platform" && (
                     <CommandItem
                       onSelect={() => handleSelectOperator("contains")}
@@ -715,18 +708,24 @@ export default function QueryBar({
                 </CommandGroup>
                 {valueSuggestions.length === 0 && !inputValue && (
                   <CommandEmpty>
-                    {fieldValuesQuery.isLoading
-                      ? "Loading..."
-                      : platformOnly
-                        ? "No platforms recorded yet"
-                        : "Type a value or wait for suggestions"}
+                    {fieldValuesQuery.isError
+                      ? FIXED_VALUE_FIELDS.has(selectedField)
+                        ? "Couldn't load suggestions."
+                        : "Couldn't load suggestions — type a value to filter anyway."
+                      : fieldValuesQuery.isLoading
+                        ? "Loading..."
+                        : platformOnly
+                          ? "No platforms recorded yet"
+                          : "Type a value or wait for suggestions"}
                   </CommandEmpty>
                 )}
-                {inputValue && !platformOnly && (
-                  <CommandItem onSelect={() => handleSelectValue(inputValue)}>
-                    Use &quot;{inputValue}&quot;
-                  </CommandItem>
-                )}
+                {inputValue &&
+                  !platformOnly &&
+                  !FIXED_VALUE_FIELDS.has(selectedField) && (
+                    <CommandItem onSelect={() => handleSelectValue(inputValue)}>
+                      Use &quot;{inputValue}&quot;
+                    </CommandItem>
+                  )}
                 {selectedField.startsWith("user.") && (
                   <div className="border-t border-border px-3 py-2 text-[11px] leading-snug text-muted-foreground">
                     Matches the attribute value at the time of the event — user

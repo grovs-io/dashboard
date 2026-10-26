@@ -27,13 +27,13 @@ describe("useSSODiscovery", () => {
     mocked.mockResolvedValue({
       data: { connection_id: 12, enforce: true },
     } as never);
-    const { result } = renderHook(() => useSSODiscovery("alice@uhc.com"));
+    const { result } = renderHook(() => useSSODiscovery("alice@acme.com"));
     expect(mocked).not.toHaveBeenCalled();
     await act(async () => {
       vi.advanceTimersByTime(400);
       await Promise.resolve();
     });
-    expect(mocked).toHaveBeenCalledWith("alice@uhc.com");
+    expect(mocked).toHaveBeenCalledWith("alice@acme.com");
     expect(result.current).toEqual({ connectionId: 12, enforce: true });
   });
 
