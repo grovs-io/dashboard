@@ -30,6 +30,25 @@ export async function setupApiMocks(page: Page) {
     });
   });
 
+  // A connected project with data: Home shows its metrics, not the "Add the SDK" setup panel.
+  await page.route(
+    `**/api/v1/projects/${TEST_PROJECT.id}/sdk_status`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ios_seen_at: new Date().toISOString(),
+          android_seen_at: null,
+          web_seen_at: null,
+          has_events: true,
+          has_purchases: false,
+          has_links: true,
+        }),
+      });
+    }
+  );
+
   // Auth endpoints. The app posts to the BFF routes under /api/auth/*; the upstream
   // /oauth/* call happens server-side where page.route cannot intercept it.
   const loginResponse = {

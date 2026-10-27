@@ -20,10 +20,10 @@ test.describe("Sidebar Navigation", () => {
   test("navigates to links page", async ({ authenticatedPage: page }) => {
     await page.goto("/dashboard");
 
-    // Sections start open, so "Dynamic Links" is a direct link under LINKS.
-    const linksNav = page
-      .getByLabel("Main navigation")
-      .getByRole("link", { name: "Dynamic Links" });
+    // Sections start collapsed: open LINKS, then "Dynamic Links" is a link under it.
+    const nav = page.getByLabel("Main navigation");
+    await nav.getByRole("button", { name: "Links", exact: true }).click();
+    const linksNav = nav.getByRole("link", { name: "Dynamic Links" });
     await expect(linksNav).toBeVisible({ timeout: 10_000 });
     await linksNav.click();
 
@@ -33,9 +33,9 @@ test.describe("Sidebar Navigation", () => {
   test("navigates to settings page", async ({ authenticatedPage: page }) => {
     await page.goto("/dashboard");
 
-    const teamNav = page
-      .getByLabel("Main navigation")
-      .getByRole("link", { name: "Team" });
+    const nav = page.getByLabel("Main navigation");
+    await nav.getByRole("button", { name: "Settings", exact: true }).click();
+    const teamNav = nav.getByRole("link", { name: "Team" });
     await expect(teamNav).toBeVisible({ timeout: 10_000 });
     await teamNav.click();
 

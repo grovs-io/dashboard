@@ -437,7 +437,7 @@ test.describe("In-app messages", () => {
         .evaluate((el) => el.clientWidth)
     );
     await shot(page, "composer-templates");
-    for (const device of ["Phone, sideways", "Web page"]) {
+    for (const device of ["Phone landscape", "Web page"]) {
       await composer.getByRole("radio", { name: device }).click();
       await expect(
         composer.getByRole("img", { name: /Message preview/ })
@@ -449,7 +449,7 @@ test.describe("In-app messages", () => {
     await shot(page, "preview-web");
     await page
       .getByRole("dialog", { name: "Preview" })
-      .getByRole("radio", { name: "Phone, sideways" })
+      .getByRole("radio", { name: "Phone landscape" })
       .click();
     await shot(page, "preview-landscape");
     await page.keyboard.press("Escape");
