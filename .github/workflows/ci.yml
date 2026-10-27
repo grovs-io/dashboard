@@ -101,6 +101,8 @@ jobs:
       NEXT_PUBLIC_CLIENT_ID: placeholder
       CLIENT_SECRET: placeholder
       NEXT_PUBLIC_ENV: test
+      # The suite covers the Enterprise screens under ee/ as well.
+      NEXT_PUBLIC_GROVS_EE: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
