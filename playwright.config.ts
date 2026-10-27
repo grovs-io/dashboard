@@ -1,11 +1,20 @@
+import { existsSync, readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 // Dedicated port so e2e never collides with a dev server on 3001.
 const E2E_PORT = process.env.E2E_PORT ?? "5012";
 const E2E_URL = `http://localhost:${E2E_PORT}`;
 
+// Enterprise screens exist only in an EE build: from the environment, or .env.test, which Next reads.
+const isEnterprise =
+  process.env.NEXT_PUBLIC_GROVS_EE === "true" ||
+  (existsSync(".env.test") &&
+    /^NEXT_PUBLIC_GROVS_EE=["']?true/m.test(readFileSync(".env.test", "utf8")));
+const ENTERPRISE_ONLY = /e2e\/tests\/(event-stream|in_app|journeys|push|segments)\//;
+
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: isEnterprise ? undefined : ENTERPRISE_ONLY,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
